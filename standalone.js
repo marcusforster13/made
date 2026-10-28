@@ -81,7 +81,7 @@
       if (!c) throw erro("not_granted", "Sem código de acesso");
       let resp;
       try {
-        resp = await fetch("/api/dom", {
+        resp = await fetch("api/dom", {
           method: "POST", signal: opts.signal,
           headers: { "content-type": "application/json", "x-made-codigo": c },
           body: JSON.stringify({ input, images: imgs, tier: opts.modelTier || "default", json }),
@@ -109,7 +109,7 @@
   sample.limits = async () => ({ maxPromptBytes: 262144, images: { maxCount: 4, maxInputBytes: 3e6, mediaTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"] } });
 
   let iaLigada = null;
-  const statusIA = () => iaLigada || (iaLigada = fetch("/api/dom").then((r) => r.json()).then((s) => !!s.ia).catch(() => false));
+  const statusIA = () => iaLigada || (iaLigada = fetch("api/dom").then((r) => r.json()).then((s) => !!s.ia).catch(() => false));
 
   /* ---------- baixar arquivos ---------- */
   const downloads = {
@@ -132,5 +132,5 @@
     },
   };
 
-  if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+  if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 })();

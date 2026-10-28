@@ -1,6 +1,6 @@
 // Guarda o app no celular para abrir rápido e funcionar sem internet (a IA precisa de internet).
-const CACHE = "made-v1";
-const ARQUIVOS = ["/", "/index.html", "/standalone.js", "/mascote-app.png", "/icone-192.png", "/icone-512.png", "/manifest.webmanifest"];
+const CACHE = "made-v2";
+const ARQUIVOS = ["./", "index.html", "standalone.js", "mascote-app.png", "icone-192.png", "icone-512.png", "manifest.webmanifest"];
 
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARQUIVOS))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => {
@@ -9,11 +9,11 @@ self.addEventListener("activate", (e) => {
 });
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/")) return;
+  if (e.request.method !== "GET" || url.origin !== location.origin || url.pathname.includes("/api/")) return;
   // rede primeiro (pega atualizações), cópia guardada se estiver sem internet
   e.respondWith(
     fetch(e.request)
       .then((r) => { const copia = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copia)); return r; })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match("/")))
+      .catch(() => caches.match(e.request).then((r) => r || caches.match("./")))
   );
 });
