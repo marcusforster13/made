@@ -9,7 +9,9 @@ const PASTA = "made-backup/";
 const ULTIMA = PASTA + "ultima.json";
 const MANTER_DIAS = 30;
 
-const pronto = () => !!process.env.BLOB_READ_WRITE_TOKEN && !!process.env.MADE_CODIGO;
+// o Vercel liga o Blob com BLOB_READ_WRITE_TOKEN (jeito antigo) ou BLOB_STORE_ID + OIDC (jeito novo)
+const pronto = () => (!!process.env.BLOB_READ_WRITE_TOKEN || !!process.env.BLOB_STORE_ID) && !!process.env.MADE_CODIGO;
+const diagnostico = () => ({ token: !!process.env.BLOB_READ_WRITE_TOKEN, loja: !!process.env.BLOB_STORE_ID, oidc: !!process.env.VERCEL_OIDC_TOKEN, codigo: !!process.env.MADE_CODIGO });
 
 async function ler(caminho) {
   const r = await get(caminho, { access: "private", useCache: false });
@@ -19,7 +21,7 @@ async function ler(caminho) {
 
 export default async function handler(req, res) {
   if (!pronto()) {
-    if (req.method === "GET" && !req.headers["x-made-codigo"]) return res.status(200).json({ ok: false });
+    if (req.method === "GET" && !req.headers["x-made-codigo"]) return res.status(200).json({ ok: false, tem: diagnostico() });
     return res.status(503).json({ code: "nao_configurado", message: "Falta ligar o Blob no projeto made do Vercel" });
   }
   // sem código: só diz se o backup está ligado e quando foi o último (sem nenhum dado)
