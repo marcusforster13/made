@@ -53,7 +53,9 @@ input,select,textarea{font:inherit;color:var(--ink);background:rgba(0,0,0,.22);b
 textarea{min-height:110px;resize:vertical}
 label.f{display:grid;gap:6px;font-size:.88rem;font-weight:600;color:var(--muted)}
 .row{display:flex;gap:10px;align-items:center}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.row2>*{min-width:0}
+input[type="date"]{-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;display:block}
 .between{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .card{background:var(--surface);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--line);border-radius:24px;padding:18px;display:grid;gap:14px;box-shadow:var(--shadow);min-width:0}
 .kv{display:flex;justify-content:space-between;gap:12px;font-size:.95rem}
@@ -668,7 +670,15 @@ const INFLACAO = 4.5;
 
 const brl = v => (v<0?"−":"") + "R$ " + Math.abs(v).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const brl0 = v => (v<0?"−":"") + "R$ " + Math.abs(Math.round(v)).toLocaleString("pt-BR");
-const parseNum = s => { s=String(s??"").trim().replace(/\s|R\$/g,""); if(s.includes(",")) s=s.replace(/\./g,"").replace(",","."); const n=parseFloat(s); return isFinite(n)?n:0; };
+const parseNum = s => {
+  if(typeof s==="number") return isFinite(s)?s:0;
+  s=String(s??"").trim().toLowerCase().replace(/r\$|reais?/g,"").trim();
+  let mult=1; if(/\bmil\b|\dk\b/.test(s)){ mult=1000; s=s.replace(/\bmil\b|k\b/g,""); }
+  s=s.replace(/\s/g,"");
+  if(s.includes(",")) s=s.replace(/\./g,"").replace(",",".");            // 15.000,50 -> 15000.50
+  else if(/^\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,"");         // 15.000 -> 15000
+  const n=parseFloat(s); return isFinite(n)?n*mult:0;
+};
 const fmtIn = v => v ? String(v).replace(".",",") : "";
 const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const $ = id => document.getElementById(id);
@@ -1186,8 +1196,8 @@ function renderCarteira(){
       <div class="row2"><label class="f">Valor (R$)<input id="invValor" inputmode="decimal" placeholder="0,00"></label>
       <label class="f">Onde<select id="invTipo">${Object.entries(TIPOS_INV).map(([k,[n]])=>`<option value="${k}">${n}</option>`).join("")}</select></label></div>
       <label class="f">Para qual objetivo<select id="invDestino">${destinos.map(([id,n])=>`<option value="${esc(id)}" ${id===(P.metas[0]?.id)?"selected":""}>${esc(n)}</option>`).join("")}</select></label>
-      <div class="row2"><label class="f">Data<input id="invData" type="date" value="${ymd(hoje)}"></label>
-      <label class="f">Rende ao ano (%)<input id="invTaxa" inputmode="decimal" value="${fmtIn(TIPOS_INV.selic[1])}"></label></div>
+      <label class="f">Data<input id="invData" type="date" value="${ymd(hoje)}"></label>
+      <label class="f">Rende ao ano (%)<input id="invTaxa" inputmode="decimal" value="${fmtIn(TIPOS_INV.selic[1])}"></label>
       <label class="f">Nome (opcional)<input id="invNome" maxlength="40" placeholder="Ex.: Tesouro Selic 2029"></label>
       <button class="gold" id="invSalvar" type="button">Salvar</button>
       <span class="tiny muted">As taxas são estimativas para você ter uma ideia. O valor exato está no app do seu banco ou corretora.</span>
@@ -1667,9 +1677,12 @@ function depoisDeCarregar(){
 
 /* ações que o Dom pode fazer no app */
 async function aplicarAcao(a){
-  const P=state.perfil, tipo=String(a?.tipo||"");
+  const P=state.perfil; let tipo=String(a?.tipo||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim();
+  const ENTRA=["entrada","ganho","receita","recebimento","salario"], SAI=["saida","gasto","despesa","compra","pagamento"];
+  if(ENTRA.includes(tipo)||SAI.includes(tipo)){ a={...a,tipo_mov:a.tipo_mov||(ENTRA.includes(tipo)?"entrada":"saida")}; tipo="lancamento"; }
   if(tipo==="lancamento"){
-    const t=normalizar({...a,tipo:a.tipo_mov==="entrada"?"entrada":"saida"}); if(!(t.valor>0)) return null;
+    const mov=String(a.tipo_mov||a.movimento||"saida").toLowerCase();
+    const t=normalizar({...a,tipo:ENTRA.some(x=>mov.startsWith(x.slice(0,4)))?"entrada":"saida"}); if(!(t.valor>0)) return null;
     const id=await adicionar(t); if(!id) return null;
     if(t.tipo==="entrada") setTimeout(()=>abrirPlano({...t,id}),600);
     return {txt:`${t.tipo==="entrada"?"Entrada":"Gasto"}: ${t.desc||t.cat} ${brl(t.valor)} (${t.cat}${t.superfluo?", supérfluo":""})`,undo:{k:"tx",id}};
@@ -1776,6 +1789,7 @@ Além de conversar, você ANOTA no app o que a pessoa contar na ÚLTIMA mensagem
 - Aplicou/investiu dinheiro (Tesouro Selic, CDB, Tesouro IPCA+, poupança, LCI/LCA…) → "investir", com "destino" = "reserva" ou o nome da meta (ex.: "sítio"). Tirou dinheiro de um investimento → "resgatar". Não use "guardar" para dinheiro investido (o "investir" já soma na meta).
 - Nova meta → "criar_meta". Mudar valor, prazo, nome ou quanto já juntou de uma meta → "editar_meta".
 - Pediu para apagar ou corrigir um lançamento errado → "apagar_lancamento" (e, se for correção, um "lancamento" novo com o valor certo).
+- "valor" é SEMPRE um número em reais, sem ponto de milhar e sem texto: 15 mil = 15000, R$ 1.250,90 = 1250.9.
 - Se faltar o valor, PERGUNTE em vez de inventar. Nunca repita ações de mensagens anteriores (elas já foram feitas). Se for só uma pergunta, "acoes" fica vazio.
 - Depois de anotar, confirme em uma frase curta e, quando fizer sentido, dê uma dica concreta com números (ex.: quanto isso pesa no mês ou no sítio).
 
@@ -1802,9 +1816,12 @@ Responda SOMENTE com JSON:
  {"tipo":"editar_meta","nome":"meta atual","novo_nome":"","alvo":0,"anos":0,"guardado":0},
  {"tipo":"apagar_lancamento","desc":"","valor":0,"data":"AAAA-MM-DD"}
 ]} (use só as ações necessárias; lista vazia se não houver)`,{cache:false});
-    const feitas=[];
-    for(const a of (Array.isArray(r?.acoes)?r.acoes:[]).slice(0,12)){ try{ const x=await aplicarAcao(a); if(x) feitas.push(x); }catch(e){} }
-    const resposta=String(r?.resposta||"").trim()||(feitas.length?"Anotado!":"Não entendi bem. Pode repetir?");
+    const feitas=[], pedidas=(Array.isArray(r?.acoes)?r.acoes:[]).filter(a=>a&&typeof a==="object").slice(0,12); let falhas=0;
+    for(const a of pedidas){ try{ const x=await aplicarAcao(a); if(x) feitas.push(x); else falhas++; }catch(e){ falhas++; } }
+    let resposta=String(r?.resposta||"").trim()||(feitas.length?"Anotado!":"Não entendi bem. Pode repetir?");
+    if(falhas) resposta+=`
+
+⚠️ ${falhas===pedidas.length?"Não consegui anotar isso":`Não consegui anotar ${falhas} ${falhas===1?"item":"itens"}`} no app. Pode repetir com o valor em número? Ex.: "gastei 15000 em …"`;
     let resumo=null;
     if(feitas.some(x=>["tx","fixo","guardar","limite","inv","tx_volta"].includes(x.undo?.k))){ await new Promise(r=>setTimeout(r,350)); resumo=contaDoMes(feitas); }
     d.msgs.push({r:"d",t:resposta,em:Date.now(),acoes:feitas,resumo});
