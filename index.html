@@ -1473,18 +1473,49 @@ function ditar(input, botao, aoTerminar){
   rec.onresult=ev=>{ let parcial=""; for(let i=ev.resultIndex;i<ev.results.length;i++){ const t=ev.results[i][0].transcript; if(ev.results[i].isFinal) final+=t; else parcial+=t; } input.value=antes+final+parcial; };
   rec.onerror=ev=>{ if(ev.error==="not-allowed"||ev.error==="service-not-allowed") toast("Libere o microfone para o site nas configurações do navegador."); else if(ev.error!=="no-speech"&&ev.error!=="aborted") toast("Não consegui ouvir. Tente de novo."); };
   rec.onend=()=>{ botao.classList.remove("ouvindo"); ouvindo=null; if(final.trim()&&aoTerminar) aoTerminar(); };
-  try{ rec.start(); ouvindo=rec; botao.classList.add("ouvindo"); speechSynthesis?.cancel?.(); }catch(e){ toast("Não deu para ligar o microfone."); }
+  try{ rec.start(); ouvindo=rec; botao.classList.add("ouvindo"); speechSynthesis?.cancel?.(); somDom.pause(); }catch(e){ toast("Não deu para ligar o microfone."); }
 }
 $("domMic").onclick=()=>ditar($("domTxt"),$("domMic"),()=>{ const t=$("domTxt").value; $("domTxt").value=""; falarComDom(t); });
 $("qMic").onclick=()=>ditar($("qTexto"),$("qMic"),()=>$("fRapido").requestSubmit());
-function falar(texto){
+/* voz própria do Dom (ElevenLabs, pela api/voz); sem ela, a voz do celular */
+const somDom=new Audio(); let vozPro=null, somLiberado=false, somUrl="";
+const SILENCIO=(()=>{ const n=800, b=new DataView(new ArrayBuffer(44+n*2)), w=(o,t)=>[...t].forEach((c,i)=>b.setUint8(o+i,c.charCodeAt(0)));
+  w(0,"RIFF"); b.setUint32(4,36+n*2,true); w(8,"WAVEfmt "); b.setUint32(16,16,true); b.setUint16(20,1,true); b.setUint16(22,1,true); b.setUint32(24,8000,true); b.setUint32(28,16000,true); b.setUint16(32,2,true); b.setUint16(34,16,true); w(36,"data"); b.setUint32(40,n*2,true);
+  return "data:audio/wav;base64,"+btoa(String.fromCharCode(...new Uint8Array(b.buffer))); })();
+// o iPhone só deixa tocar som depois de um toque da pessoa: libera o tocador no primeiro toque
+addEventListener("pointerdown",()=>{ if(somLiberado) return; somLiberado=true; somDom.src=SILENCIO; somDom.play().then(()=>somDom.pause()).catch(()=>{}); },{capture:true});
+async function temVozPro(){
+  if(vozPro!==null) return vozPro;
+  if(!window.MADE) return vozPro=false;
+  try{ vozPro=!!(await (await fetch("api/voz")).json()).ok; }catch(e){ vozPro=false; }
+  return vozPro;
+}
+function falarCelular(texto){
   try{
     if(!window.speechSynthesis) return;
     speechSynthesis.cancel();
-    const u=new SpeechSynthesisUtterance(String(texto).replace(/[\u{1F300}-\u{1FAFF}]/gu,"")); u.lang="pt-BR"; u.rate=1.04; u.pitch=1.1;
+    const u=new SpeechSynthesisUtterance(texto); u.lang="pt-BR"; u.rate=1.04; u.pitch=1.1;
     const v=speechSynthesis.getVoices().find(x=>/^pt(-|_)BR/i.test(x.lang)); if(v) u.voice=v;
     speechSynthesis.speak(u);
   }catch(e){}
+}
+async function falar(texto){
+  texto=String(texto).replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,"").trim(); if(!texto) return;
+  if(await temVozPro()){
+    try{
+      const c=window.MADE.codigo(true);
+      const r=await fetch("api/voz",{method:"POST",headers:{"content-type":"application/json","x-made-codigo":c},body:JSON.stringify({texto})});
+      if(r.status===401) window.MADE.esquecer();
+      if(r.ok){
+        if(somUrl) URL.revokeObjectURL(somUrl);
+        somUrl=URL.createObjectURL(await r.blob()); somDom.src=somUrl;
+        await somDom.play(); return;
+      }
+      const e=await r.json().catch(()=>({}));
+      if(e.code==="sem_creditos") toast("Acabaram os créditos de voz do ElevenLabs. Usando a voz do celular.");
+    }catch(e){}
+  }
+  falarCelular(texto);
 }
 function renderVoz(){ $("domVoz").setAttribute("aria-pressed",!!state.perfil.domVoz); }
 $("domVoz").onclick=()=>{ state.perfil.domVoz=!state.perfil.domVoz; salvarPerfil(); renderVoz(); toast(state.perfil.domVoz?`O ${nomePet()} vai falar as respostas`:"Respostas só por escrito"); if(state.perfil.domVoz) falar("Oi! Agora eu falo com você."); };
