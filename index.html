@@ -361,6 +361,7 @@ a.linkbtn::after{content:"↗";color:var(--gold);font-weight:800}
 
   <!-- METAS -->
   <main class="screen" id="s-metas" hidden>
+    <section class="card" id="cardCarteira"></section>
     <section class="card" id="cardReserva"></section>
     <div id="metas" style="display:grid;gap:16px"></div>
     <button id="novaMeta" class="block">+ Criar outra meta</button>
@@ -677,7 +678,7 @@ const inicial = c => (c||"?").replace(/[^A-Za-zÀ-ú]/g,"").slice(0,1).toUpperCa
 
 const state = {
   tx: [],
-  perfil: {reserva:0, meses:6, aporte:0, taxa:11, anos:5, autoAnalise:true, guardarMes:0, fixos:[], emailSemanal:false, emailUltimo:"", mascote:"", semanal:null, analise:null, limites:{}, dividas:[], extraDivida:0,
+  perfil: {reserva:0, meses:6, aporte:0, taxa:11, anos:5, autoAnalise:true, guardarMes:0, fixos:[], investimentos:[], emailSemanal:false, emailUltimo:"", mascote:"", semanal:null, analise:null, limites:{}, dividas:[], extraDivida:0,
     metas:[{id:"sitio",nome:"Sítio",alvo:200000,guardado:0,anos:8,inflacao:true,exemplo:true}]},
   mes: ymd(hoje).slice(0,7), tela:"inicio", tipo:"saida", cat:"Mercado", pag:"Pix", diaOff:0,
   filtro:"todos", vis:"lista", aberto:null, verTodosAlertas:false,
@@ -774,7 +775,7 @@ function render(){
   renderPet(T); renderContas(); renderSemana(); renderAjustes(); renderDom(); renderEmail(); renderBackup();
   renderAlertas(list,T); renderMiniAnalise(); renderOrcMini(list,T); renderMetaMini(T);
   renderLista(list); renderCats(list);
-  renderReserva(T); renderMetas(T);
+  renderCarteira(); renderReserva(T); renderMetas(T);
   renderAnalise(); renderLimites(list,T); renderDividas(); renderInvest();
   renderIAEstado();
 }
@@ -937,6 +938,14 @@ async function montarPdf(){
   para(`Reserva de emergência: ${brl0(P.reserva)} de ${brl0(ess*P.meses)} (${P.meses} meses de gastos essenciais).`);
   for(const m of P.metas){ quebra(40); const al=alvoReal(m), pc=Math.min(m.guardado/al,1); para(`${m.nome}: ${brl0(m.guardado)} de ${brl0(al)}${m.inflacao?" (corrigido pela inflação)":""}. Guardar ${brl0(mensalNecessario(m))} por mês para chegar em ${fmtIn(m.anos)} anos.`,{b:1});
     cor(C.soft,1); doc.roundedRect(M,y-4,CW,8,4,4,"F"); cor(C.gold,1); if(pc>0) doc.roundedRect(M,y-4,Math.max(CW*pc,8),8,4,4,"F"); y+=16; }
+  // investimentos
+  const IV=invDe(); if(IV.L.length){
+    secao("Investimentos");
+    para(`Você colocou ${brl0(IV.aplicado)}. Valor estimado hoje: ${brl0(IV.hoje)} (rendeu ${brl0(IV.rendeu)} antes do imposto de renda).`,{b:1});
+    const porTipo={}; for(const i of IV.L){ const k=i.tipo+"|"+i.destino; porTipo[k]=porTipo[k]||{t:i.tipo,d:i.destino,a:0,h:0}; porTipo[k].a+=i.valor; porTipo[k].h+=invValorHoje(i); }
+    for(const x of Object.values(porTipo).filter(x=>Math.abs(x.a)>0.004)) para(`• ${TIPOS_INV[x.t][0]} (${nomeDestino(x.d)}): colocou ${brl0(x.a)}, vale ~${brl0(x.h)}`,{x:M+8,w:CW-8});
+    y+=2; para("Valores estimados com a taxa anual de cada aplicação. O valor exato está no app do banco ou da corretora.",{s:8,c:C.muted});
+  }
   // dívidas
   if(P.dividas?.length){ secao("Dívidas"); const pl=planoDividas(P.dividas,P.extraDivida||0,"avalanche");
     P.dividas.forEach(d=>para(`• ${d.nome}: deve ${brl0(d.saldo)}, juros ${fmtIn(d.juros)}% ao mês, paga ${brl0(d.parcela)}/mês`,{x:M+8,w:CW-8}));
@@ -1138,6 +1147,62 @@ document.querySelectorAll("[data-vis]").forEach(b=>b.onclick=()=>{ state.vis=b.d
 $("filtros").querySelectorAll("button").forEach(b=>b.onclick=()=>{ state.filtro=b.dataset.f; $("filtros").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b)); render(); });
 
 /* metas */
+/* investimentos: onde o dinheiro de cada meta e da reserva está aplicado */
+const TIPOS_INV={selic:["Tesouro Selic",11],cdb:["CDB",10.8],ipca:["Tesouro IPCA+",INFLACAO+6.5],poupanca:["Poupança",6.2],lci:["LCI / LCA",9.5],outro:["Outro",8]};
+const tipoInv=t=>TIPOS_INV[t]?t:"outro";
+function invValorHoje(i){ const dias=Math.max(0,(new Date(ymd(hoje))-new Date(i.data))/864e5); return i.valor*Math.pow(1+(i.taxa||0)/100,dias/365); }
+function invDe(destino){ const L=(state.perfil.investimentos||[]).filter(i=>!destino||i.destino===destino); const aplicado=L.reduce((s,i)=>s+i.valor,0), hojeV=L.reduce((s,i)=>s+invValorHoje(i),0); return {L,aplicado,hoje:hojeV,rendeu:hojeV-aplicado}; }
+const nomeDestino=d=>d==="reserva"?"Reserva":(state.perfil.metas.find(m=>m.id===d)?.nome||"Meta");
+function moverDestino(destino,v){ const P=state.perfil; if(destino==="reserva") P.reserva=Math.max(0,Math.round((P.reserva+v)*100)/100); else { const m=P.metas.find(x=>x.id===destino); if(m){ m.guardado=Math.max(0,Math.round((m.guardado+v)*100)/100); delete m.exemplo; } } }
+function acharDestino(nome){ const n=String(nome||"").toLowerCase(); if(!n||n.includes("reserva")||n.includes("emerg")) return n?"reserva":(state.perfil.metas[0]?.id||"reserva"); return (state.perfil.metas.find(m=>n.includes(m.nome.toLowerCase())||m.nome.toLowerCase().includes(n))||state.perfil.metas[0])?.id||"reserva"; }
+function acharTipo(t){ const n=String(t||"").toLowerCase(); if(TIPOS_INV[n]) return n; if(n.includes("selic")) return "selic"; if(n.includes("ipca")) return "ipca"; if(n.includes("cdb")||n.includes("cdi")) return "cdb"; if(n.includes("poupan")) return "poupanca"; if(n.includes("lci")||n.includes("lca")) return "lci"; return "outro"; }
+function novoInvestimento({valor,tipo,nome,destino,data,taxa}){
+  const t=tipoInv(tipo), v=Math.round(valor*100)/100;
+  const i={id:"i"+Date.now().toString(36)+Math.random().toString(36).slice(2,5),tipo:t,nome:String(nome||TIPOS_INV[t][0]).slice(0,40),valor:v,data:/^\d{4}-\d{2}-\d{2}$/.test(data||"")?data:ymd(hoje),taxa:taxa>0?taxa:TIPOS_INV[t][1],destino:destino||"reserva"};
+  state.perfil.investimentos=[...(state.perfil.investimentos||[]),i]; moverDestino(i.destino,v); salvarPerfil(true); return i;
+}
+function tirarInvestimento(id){ const P=state.perfil, i=(P.investimentos||[]).find(x=>x.id===id); if(!i) return null; P.investimentos=P.investimentos.filter(x=>x!==i); moverDestino(i.destino,-i.valor); salvarPerfil(true); return i; }
+function htmlInvDe(destino){
+  const I=invDe(destino); if(!I.L.length) return "";
+  const porTipo={}; for(const i of I.L) porTipo[i.tipo]=(porTipo[i.tipo]||0)+i.valor;
+  return `<div class="small" style="display:grid;gap:4px;background:var(--surface2);border-radius:14px;padding:10px 12px"><span class="tiny muted" style="font-weight:700;letter-spacing:.06em;text-transform:uppercase">Onde está investido</span>${Object.entries(porTipo).filter(([,v])=>v>0.004).map(([t,v])=>`<div class="kv"><span>${esc(TIPOS_INV[t][0])}</span><b data-priv>${brl0(v)}</b></div>`).join("")}<div class="kv"><span class="muted">Rendeu até hoje (estimativa)</span><b class="pos" data-priv>+${brl0(I.rendeu)}</b></div></div>`;
+}
+function renderCarteira(){
+  const el=$("cardCarteira"); if(el.contains(document.activeElement)) return;
+  const P=state.perfil, I=invDe(), porTipo={};
+  for(const i of I.L){ porTipo[i.tipo]=porTipo[i.tipo]||{a:0,h:0}; porTipo[i.tipo].a+=i.valor; porTipo[i.tipo].h+=invValorHoje(i); }
+  const destinos=[["reserva","Reserva de emergência"],...P.metas.map(m=>[m.id,m.nome])];
+  const max=Math.max(1,...Object.values(porTipo).map(x=>x.h));
+  el.innerHTML=`<div class="between"><div><span class="advisor-tag">Investimentos</span><h2 style="margin-top:6px">Onde está seu dinheiro</h2></div></div>
+    ${I.L.length?`<div class="row2" style="gap:10px">
+      <div><span class="tiny muted">Você colocou</span><div class="serif" style="font-size:1.5rem" data-priv>${brl0(I.aplicado)}</div></div>
+      <div><span class="tiny muted">Vale hoje (estimativa)</span><div class="serif pos" style="font-size:1.5rem" data-priv>${brl0(I.hoje)}</div></div></div>
+      <div class="small">Rendeu <b class="pos" data-priv>+${brl0(I.rendeu)}</b> até hoje, antes do imposto de renda.</div>
+      <div class="bars">${Object.entries(porTipo).filter(([,x])=>x.a>0.004).sort((a,b)=>b[1].h-a[1].h).map(([t,x])=>`<div class="bar"><div class="kv"><span>${esc(TIPOS_INV[t][0])}</span><b data-priv>${brl0(x.h)}</b></div><div class="meter"><i class="gold" style="width:${x.h/max*100}%"></i></div></div>`).join("")}</div>
+      <details style="box-shadow:none;background:var(--surface2)"><summary>Ver aplicações (${I.L.length})</summary><div class="inner">${[...I.L].sort((a,b)=>b.data.localeCompare(a.data)).map(i=>`<div class="fixo"><span><b style="font-weight:600">${esc(i.nome)}</b><span class="tiny muted" style="display:block">${i.valor<0?"resgate":"aplicado"} em ${i.data.slice(8,10)}/${i.data.slice(5,7)}/${i.data.slice(0,4)} · ${fmtIn(Math.round(i.taxa*10)/10)}% ao ano · ${esc(nomeDestino(i.destino))}</span></span><b class="${i.valor<0?"neg":""}" data-priv>${brl0(i.valor)}</b><button type="button" class="ghost" data-tirainv="${esc(i.id)}" style="color:var(--bad)">Apagar</button></div>`).join("")}</div></details>`
+    :`<div class="small muted">Quando você aplicar dinheiro (Tesouro Selic, CDB, Tesouro IPCA+, poupança…), registre aqui ou conte ao ${esc(nomePet())}: <i>"apliquei 500 no Tesouro Selic pro sítio"</i>. O app mostra quanto rendeu.</div>`}
+    <details style="box-shadow:none;background:var(--surface2)" id="invNovo"><summary>+ Registrar aplicação ou resgate</summary><div class="inner">
+      <div class="seg" role="group" aria-label="Tipo de movimento"><button type="button" data-mov="ap" aria-pressed="true">Apliquei</button><button type="button" data-mov="rs" aria-pressed="false">Resgatei</button></div>
+      <div class="row2"><label class="f">Valor (R$)<input id="invValor" inputmode="decimal" placeholder="0,00"></label>
+      <label class="f">Onde<select id="invTipo">${Object.entries(TIPOS_INV).map(([k,[n]])=>`<option value="${k}">${n}</option>`).join("")}</select></label></div>
+      <label class="f">Para qual objetivo<select id="invDestino">${destinos.map(([id,n])=>`<option value="${esc(id)}" ${id===(P.metas[0]?.id)?"selected":""}>${esc(n)}</option>`).join("")}</select></label>
+      <div class="row2"><label class="f">Data<input id="invData" type="date" value="${ymd(hoje)}"></label>
+      <label class="f">Rende ao ano (%)<input id="invTaxa" inputmode="decimal" value="${fmtIn(TIPOS_INV.selic[1])}"></label></div>
+      <label class="f">Nome (opcional)<input id="invNome" maxlength="40" placeholder="Ex.: Tesouro Selic 2029"></label>
+      <button class="gold" id="invSalvar" type="button">Salvar</button>
+      <span class="tiny muted">As taxas são estimativas para você ter uma ideia. O valor exato está no app do seu banco ou corretora.</span>
+    </div></details>`;
+  let mov="ap";
+  el.querySelectorAll("[data-mov]").forEach(b=>b.onclick=()=>{ mov=b.dataset.mov; el.querySelectorAll("[data-mov]").forEach(x=>x.setAttribute("aria-pressed",x===b)); });
+  $("invTipo").onchange=()=>{ $("invTaxa").value=fmtIn(TIPOS_INV[$("invTipo").value][1]); };
+  $("invSalvar").onclick=()=>{
+    const v=parseNum($("invValor").value); if(v<=0){ toast("Digite o valor."); return; }
+    const i=novoInvestimento({valor:mov==="rs"?-v:v,tipo:$("invTipo").value,nome:$("invNome").value.trim(),destino:$("invDestino").value,data:$("invData").value,taxa:parseNum($("invTaxa").value)});
+    document.activeElement?.blur(); render(); toast(`${mov==="rs"?"Resgate":"Aplicação"} de ${brl(v)} registrada em ${nomeDestino(i.destino)}`);
+  };
+  el.querySelectorAll("[data-tirainv]").forEach(b=>b.onclick=()=>{ if(b.dataset.armed){ tirarInvestimento(b.dataset.tirainv); render(); toast("Aplicação apagada"); } else { b.dataset.armed="1"; b.textContent="Confirmar"; } });
+}
+
 function renderReserva(T){
   const el=$("cardReserva"); if(el.contains(document.activeElement)) return;
   const P=state.perfil, ess=essMedio()||T.ess, meta=ess*P.meses, p=meta?Math.min(P.reserva/meta*100,100):0, falta=Math.max(meta-P.reserva,0), sobra=Math.max(T.saldo,0);
@@ -1148,6 +1213,7 @@ function renderReserva(T){
     <div class="small">${!meta?"Anote seus gastos essenciais para calcular a meta.":falta<=0?"<b class='pos'>Reserva completa.</b> Agora todo o foco vai para o sítio.":`Faltam <b>${brl0(falta)}</b>${sobra?` · guardando ${brl0(sobra)}/mês, leva ${tempo(Math.ceil(falta/sobra))}`:""}.`}</div>
     <div class="row2"><label class="f">Já tenho guardado<input id="pRes" inputmode="decimal" value="${fmtIn(P.reserva)}" placeholder="0,00"></label>
     <label class="f">Cobrir quantos meses<select id="pMeses">${[3,6,12].map(n=>`<option value="${n}" ${P.meses==n?"selected":""}>${n} meses</option>`).join("")}</select></label></div>
+    ${htmlInvDe("reserva")}
     <div class="tiny muted">Base: média de ${brl0(ess)}/mês em gastos essenciais. Lugar certo: Tesouro Selic ou CDB com liquidez diária.</div>`;
   $("pRes").onchange=()=>{ P.reserva=parseNum($("pRes").value); salvarPerfil(); $("pRes").blur(); render(); };
   $("pMeses").onchange=()=>{ P.meses=+$("pMeses").value; salvarPerfil(); $("pMeses").blur(); render(); };
@@ -1164,6 +1230,7 @@ function renderMetas(T){
         <div class="stack"><i style="width:${pct}%;background:var(--gold)"></i></div>
       </div>
       <div style="padding:18px;display:grid;gap:14px">
+        ${htmlInvDe(m.id)}
         <div class="kv"><span>Guardar por mês</span><b class="serif" style="font-size:1.25rem">${brl0(need)}</b></div>
         <div class="kv"><span>No ritmo deste mês (${brl0(sobra)}/mês)</span><b>${tempo(mA)}</b></div>
         ${T.sup?`<div class="kv"><span>Cortando metade dos supérfluos</span><b class="pos">${tempo(mC)}</b></div>`:""}
@@ -1282,6 +1349,8 @@ function contexto(){
   const metas=P.metas.map(m=>`${m.nome}: custa hoje R$ ${m.alvo}${m.inflacao?` (R$ ${alvoReal(m).toFixed(0)} corrigido pela inflação)`:""}, já tem R$ ${m.guardado}, prazo ${m.anos} anos, precisa guardar R$ ${mensalNecessario(m).toFixed(0)}/mês`).join("\n");
   const dividas=P.dividas.map(d=>`${d.nome}: deve R$ ${d.saldo}, juros ${d.juros}% ao mês, paga R$ ${d.parcela}/mês`).join("\n");
   const lim=Object.entries(P.limites||{}).map(([c,v])=>`${c} ${v}`).join(", ");
+  const invs=(P.investimentos||[]).map(i=>`${i.data} ${i.valor<0?"resgate":"aplicação"} R$ ${i.valor} em ${TIPOS_INV[i.tipo][0]} (${i.nome}, ~${i.taxa}% a.a.) para ${nomeDestino(i.destino)}`).join("\n");
+  const IT=invDe();
   return `Hoje é ${ymd(hoje)}. Mês analisado: ${state.mes}. Valores em reais. Pessoa no Brasil, sem formação em finanças.
 Totais do mês: entrou ${T.ent.toFixed(2)}, saiu ${T.sai.toFixed(2)}, sobrou ${T.saldo.toFixed(2)}, supérfluo ${T.sup.toFixed(2)}, essencial ${T.ess.toFixed(2)}, desejos ${T.des.toFixed(2)}.
 Reserva de emergência: tem R$ ${P.reserva}, quer cobrir ${P.meses} meses (média de essenciais ${essMedio().toFixed(0)}/mês).
@@ -1289,6 +1358,8 @@ Metas:
 ${metas||"nenhuma"}
 Dívidas:
 ${dividas||"nenhuma cadastrada"}
+Investimentos (total aplicado R$ ${IT.aplicado.toFixed(0)}, valendo ~R$ ${IT.hoje.toFixed(0)} hoje):
+${invs||"nenhum registrado"}
 Limites de orçamento: ${lim||"nenhum"}
 Gastos fixos todo mês: ${(P.fixos||[]).map(f=>`${f.nome} ${f.valor} (dia ${f.dia}, ${f.cat})`).join("; ")||"nenhum cadastrado"}
 Próximas contas a vencer: ${proximasContas(10).map(x=>`${x.f.nome} ${x.f.valor} ${quando(x.faltam)} (${x.data})`).join("; ")||"nenhuma nos próximos 10 dias"}
@@ -1633,6 +1704,40 @@ async function aplicarAcao(a){
     if(!(d.saldo>0)) return null; P.dividas=[...P.dividas,d]; salvarPerfil(true);
     return {txt:`Dívida anotada: ${d.nome} ${brl0(d.saldo)}${d.juros?`, ${fmtIn(d.juros)}% ao mês`:""}`,undo:{k:"divida",id:d.id}};
   }
+  if(tipo==="investir"||tipo==="resgatar"){
+    const v=Math.abs(parseNum(a.valor)); if(!(v>0)) return null;
+    const i=novoInvestimento({valor:tipo==="resgatar"?-v:v,tipo:acharTipo(a.onde||a.tipo_inv),nome:a.nome,destino:acharDestino(a.destino),data:a.data,taxa:parseNum(a.taxa)});
+    return {txt:`${tipo==="resgatar"?"Resgate":"Aplicação"}: ${brl(v)} em ${TIPOS_INV[i.tipo][0]} (${nomeDestino(i.destino)})`,undo:{k:"inv",id:i.id}};
+  }
+  if(tipo==="criar_meta"){
+    const alvo=Math.abs(parseNum(a.alvo)); if(!(alvo>0)) return null;
+    const m={id:"m"+Date.now().toString(36),nome:String(a.nome||"Meta").slice(0,40),alvo,guardado:Math.abs(parseNum(a.guardado))||0,anos:Math.max(0.5,parseNum(a.anos)||2),inflacao:!!a.inflacao};
+    P.metas=[...P.metas,m]; salvarPerfil(true);
+    return {txt:`Meta nova: ${m.nome}, ${brl0(m.alvo)} em ${fmtIn(m.anos)} anos`,undo:{k:"meta_nova",id:m.id}};
+  }
+  if(tipo==="editar_meta"){
+    const n=String(a.nome||"").toLowerCase(), m=P.metas.find(x=>n&&(x.nome.toLowerCase().includes(n)||n.includes(x.nome.toLowerCase())))||(P.metas.length===1?P.metas[0]:null); if(!m) return null;
+    const antes={...m}, mud=[];
+    if(a.novo_nome){ m.nome=String(a.novo_nome).slice(0,40); mud.push("nome"); }
+    if(parseNum(a.alvo)>0){ m.alvo=parseNum(a.alvo); mud.push(`valor ${brl0(m.alvo)}`); }
+    if(parseNum(a.anos)>0){ m.anos=Math.max(0.5,parseNum(a.anos)); mud.push(`prazo ${fmtIn(m.anos)} anos`); }
+    if(a.guardado!==undefined&&a.guardado!==null&&a.guardado!==""){ m.guardado=Math.abs(parseNum(a.guardado)); mud.push(`juntado ${brl0(m.guardado)}`); }
+    if(typeof a.inflacao==="boolean"){ m.inflacao=a.inflacao; mud.push(a.inflacao?"com inflação":"sem inflação"); }
+    if(!mud.length) return null; delete m.exemplo; salvarPerfil(true);
+    return {txt:`${m.nome}: ${mud.join(", ")}`,undo:{k:"meta_edit",id:m.id,antes}};
+  }
+  if(tipo==="pagar_divida"){
+    const n=String(a.nome||"").toLowerCase(), d=P.dividas.find(x=>n&&x.nome.toLowerCase().includes(n))||(P.dividas.length===1?P.dividas[0]:null), v=Math.abs(parseNum(a.valor));
+    if(!d||!(v>0)) return null; const tirou=Math.min(v,d.saldo); d.saldo=Math.round((d.saldo-tirou)*100)/100; salvarPerfil(true);
+    return {txt:`${d.nome}: paguei ${brl0(tirou)}, falta ${brl0(d.saldo)}`,undo:{k:"divida_pag",id:d.id,v:tirou}};
+  }
+  if(tipo==="apagar_lancamento"){
+    const n=String(a.desc||"").toLowerCase(), v=parseNum(a.valor);
+    const cands=state.tx.filter(t=>(!n||(t.desc||t.cat).toLowerCase().includes(n)||t.cat.toLowerCase().includes(n))&&(!v||Math.abs(t.valor-v)<0.01)&&(!a.data||t.data===a.data)).sort((x,y)=>(y.criado||0)-(x.criado||0));
+    const t=cands[0]; if(!t||(!n&&!v)) return null;
+    const {id,...copia}=t; await apagar(id);
+    return {txt:`Apaguei: ${t.desc||t.cat} ${brl(t.valor)} (${t.data.slice(8,10)}/${t.data.slice(5,7)})`,undo:{k:"tx_volta",t:copia}};
+  }
   return null;
 }
 async function desfazer(i,k){
@@ -1644,7 +1749,12 @@ async function desfazer(i,k){
   if(u.k==="guardar"){ if(u.alvo==="reserva") P.reserva=Math.max(0,Math.round((P.reserva-u.v)*100)/100); else { const m=P.metas.find(x=>x.id===u.alvo); if(m) m.guardado=Math.max(0,Math.round((m.guardado-u.v)*100)/100); } }
   if(u.k==="limite"){ if(u.prev) P.limites[u.c]=u.prev; else delete P.limites[u.c]; }
   if(u.k==="divida") P.dividas=P.dividas.filter(d=>d.id!==u.id);
-  if(u.k!=="tx") salvarPerfil(true);
+  if(u.k==="inv") tirarInvestimento(u.id);
+  if(u.k==="meta_nova") P.metas=P.metas.filter(m=>m.id!==u.id);
+  if(u.k==="meta_edit"){ const m=P.metas.find(x=>x.id===u.id); if(m) Object.assign(m,u.antes); }
+  if(u.k==="divida_pag"){ const d=P.dividas.find(x=>x.id===u.id); if(d) d.saldo=Math.round((d.saldo+u.v)*100)/100; }
+  if(u.k==="tx_volta") await adicionar({...u.t,criado:Date.now()});
+  if(u.k!=="tx"&&u.k!=="tx_volta") salvarPerfil(true);
   const atual=state.dom.msgs[i]?.acoes?.[k]; if(atual) atual.desfeita=true;
   salvarChat(); render(); toast("Desfeito");
 }
@@ -1662,7 +1772,10 @@ Além de conversar, você ANOTA no app o que a pessoa contar na ÚLTIMA mensagem
 - Gasto ou ganho que já aconteceu → "lancamento". Datas como "ontem" ou "sexta" viram datas reais. Sem forma de pagamento, use "Pix".
 - Conta que se repete todo mês (aluguel, internet, luz, academia, assinatura, parcela) → "fixo", com o dia do mês. O app lança sozinho todo mês.
 - "Guardei", "separei", "juntei" dinheiro → "guardar" (meta "reserva" ou o nome da meta, ex.: "sítio").
-- Pedido de limite para uma categoria → "limite". Dívida contada → "divida".
+- Pedido de limite para uma categoria → "limite". Dívida contada → "divida". Pagou parte de uma dívida → "pagar_divida".
+- Aplicou/investiu dinheiro (Tesouro Selic, CDB, Tesouro IPCA+, poupança, LCI/LCA…) → "investir", com "destino" = "reserva" ou o nome da meta (ex.: "sítio"). Tirou dinheiro de um investimento → "resgatar". Não use "guardar" para dinheiro investido (o "investir" já soma na meta).
+- Nova meta → "criar_meta". Mudar valor, prazo, nome ou quanto já juntou de uma meta → "editar_meta".
+- Pediu para apagar ou corrigir um lançamento errado → "apagar_lancamento" (e, se for correção, um "lancamento" novo com o valor certo).
 - Se faltar o valor, PERGUNTE em vez de inventar. Nunca repita ações de mensagens anteriores (elas já foram feitas). Se for só uma pergunta, "acoes" fica vazio.
 - Depois de anotar, confirme em uma frase curta e, quando fizer sentido, dê uma dica concreta com números (ex.: quanto isso pesa no mês ou no sítio).
 
@@ -1681,13 +1794,19 @@ Responda SOMENTE com JSON:
  {"tipo":"remover_fixo","nome":""},
  {"tipo":"guardar","meta":"reserva|sítio|nome da meta","valor":0},
  {"tipo":"limite","categoria":"","valor":0},
- {"tipo":"divida","nome":"","saldo":0,"juros":0,"parcela":0}
+ {"tipo":"divida","nome":"","saldo":0,"juros":0,"parcela":0},
+ {"tipo":"pagar_divida","nome":"","valor":0},
+ {"tipo":"investir","valor":0,"onde":"selic|cdb|ipca|poupanca|lci|outro","nome":"ex.: Tesouro Selic 2029","destino":"reserva|nome da meta","data":"AAAA-MM-DD","taxa":0},
+ {"tipo":"resgatar","valor":0,"onde":"selic|cdb|ipca|poupanca|lci|outro","destino":"reserva|nome da meta"},
+ {"tipo":"criar_meta","nome":"","alvo":0,"anos":0,"guardado":0,"inflacao":true},
+ {"tipo":"editar_meta","nome":"meta atual","novo_nome":"","alvo":0,"anos":0,"guardado":0},
+ {"tipo":"apagar_lancamento","desc":"","valor":0,"data":"AAAA-MM-DD"}
 ]} (use só as ações necessárias; lista vazia se não houver)`,{cache:false});
     const feitas=[];
     for(const a of (Array.isArray(r?.acoes)?r.acoes:[]).slice(0,12)){ try{ const x=await aplicarAcao(a); if(x) feitas.push(x); }catch(e){} }
     const resposta=String(r?.resposta||"").trim()||(feitas.length?"Anotado!":"Não entendi bem. Pode repetir?");
     let resumo=null;
-    if(feitas.some(x=>["tx","fixo","guardar","limite"].includes(x.undo?.k))){ await new Promise(r=>setTimeout(r,350)); resumo=contaDoMes(feitas); }
+    if(feitas.some(x=>["tx","fixo","guardar","limite","inv","tx_volta"].includes(x.undo?.k))){ await new Promise(r=>setTimeout(r,350)); resumo=contaDoMes(feitas); }
     d.msgs.push({r:"d",t:resposta,em:Date.now(),acoes:feitas,resumo});
     if(state.perfil.domVoz) falar(resposta);
   }catch(e){
