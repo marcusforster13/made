@@ -173,7 +173,7 @@ nav.bottom .plus svg{width:28px;height:28px;stroke-width:2.4}
 .dom-head .eye[aria-pressed="true"]{color:var(--gold);border-color:rgba(228,193,127,.5)}
 .dom-head .eye[aria-pressed="false"] #domVozOnda{opacity:.25}
 .dom-chat{display:grid;gap:12px;align-content:start;min-height:30vh}
-.dm{display:grid;grid-template-columns:34px minmax(0,1fr);gap:8px;align-items:end}
+.dm{display:grid;grid-template-columns:34px minmax(0,1fr);gap:8px;align-items:end;scroll-margin-bottom:190px}
 .dm .avatar{width:34px;height:34px}
 .dm.me{grid-template-columns:minmax(0,1fr)}
 .dm .b{padding:12px 14px;border-radius:18px 18px 18px 6px;background:var(--surface);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere;font-size:.97rem;max-width:92%;justify-self:start}
@@ -183,6 +183,12 @@ nav.bottom .plus svg{width:28px;height:28px;stroke-width:2.4}
 .acoes{display:grid;gap:6px;margin-top:8px}
 .acao{display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--accent-soft);border-radius:12px;padding:6px 6px 6px 10px;font-size:.84rem;font-weight:600}
 .acao.desfeita{opacity:.5;text-decoration:line-through}
+.conta{margin-top:10px;padding:12px;border-radius:14px;background:rgba(0,0,0,.22);display:grid;gap:8px;white-space:normal}
+.conta-t{font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+.conta-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.conta-g div{display:grid;gap:1px}
+.conta-g b{font-size:1.05rem}
+.conta-l{font-size:.86rem;color:var(--ink)}
 .acao button{min-height:32px;padding:2px 10px;font-size:.78rem;white-space:nowrap;flex:none}
 .digitando span{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:4px;animation:pisca 1.2s infinite}
 .digitando span:nth-child(2){animation-delay:.2s}.digitando span:nth-child(3){animation-delay:.4s}
@@ -395,6 +401,13 @@ a.linkbtn::after{content:"↗";color:var(--gold);font-weight:800}
       <div><span class="advisor-tag">Relatórios</span><h2 style="margin-top:6px">Baixar e guardar</h2></div>
       <p class="small muted" style="margin:0">PDF com tudo do mês: resumo, gastos por categoria, alertas, diagnóstico, metas, dívidas e a lista completa de lançamentos. Bom para guardar ou mostrar para alguém de confiança.</p>
       <button class="gold block" id="btnPdf">Baixar relatório do mês (PDF)</button>
+      <button class="primary block" id="btnPdfShare" hidden>Mandar o PDF pelo WhatsApp ou outro app</button>
+      <div style="display:grid;gap:10px;border-top:1px solid var(--line);padding-top:14px">
+        <h3>Imagem do mês</h3>
+        <span class="small muted">Um cartão com o resumo do mês e o Dom, pronto para salvar na galeria ou mandar no WhatsApp.</span>
+        <img id="imgMesPrev" alt="Prévia da imagem do mês" style="width:100%;border-radius:16px;border:1px solid var(--line)" hidden>
+        <div class="row2"><button class="gold" id="btnImgSalvar">Salvar imagem</button><button id="btnImgShare">Enviar imagem</button></div>
+      </div>
       <button class="block" id="btnCsv">Baixar planilha de gastos (CSV)</button>
       <span class="small muted" id="relStatus"></span>
       <div id="emailBox" style="display:grid;gap:10px;border-top:1px solid var(--line);padding-top:14px">
@@ -829,7 +842,14 @@ $("cfgNome").onchange=()=>{ state.perfil.mascote=$("cfgNome").value.trim().slice
 const pdfTxt=s=>String(s??"").replace(/[−–—]/g,"-").replace(/→/g,"->").replace(/[^\x00-\xFF“”‘’•…]/g,"");
 let jsPdfPromessa=null;
 function carregaJsPdf(){ if(window.jspdf) return Promise.resolve(); return jsPdfPromessa||(jsPdfPromessa=new Promise((ok,err)=>{ const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"; s.onload=ok; s.onerror=()=>{ jsPdfPromessa=null; err(); }; document.head.appendChild(s); })); }
-async function imgDataUrl(){ try{ const b=await (await fetch("mascote-app.png")).blob(); return await new Promise(r=>{ const f=new FileReader(); f.onload=()=>r(f.result); f.readAsDataURL(b); }); }catch(e){ return null; } }
+// o Dom vai no PDF como JPEG sobre o verde da capa: fica uns 20 KB em vez de 600 KB
+async function imgDataUrl(){
+  try{
+    const b=await (await fetch("mascote-app.png")).blob(), bmp=await createImageBitmap(b), c=document.createElement("canvas");
+    c.width=276; c.height=300; const g=c.getContext("2d"); g.fillStyle="#0C2E26"; g.fillRect(0,0,c.width,c.height); g.drawImage(bmp,0,0,c.width,c.height);
+    return c.toDataURL("image/jpeg",0.86);
+  }catch(e){ return null; }
+}
 async function montarPdf(){
   await carregaJsPdf();
   const {jsPDF}=window.jspdf, doc=new jsPDF({unit:"pt",format:"a4"}), W=595, H=842, M=40, CW=W-2*M;
@@ -840,11 +860,11 @@ async function montarPdf(){
   const cor=(c,f)=>f?doc.setFillColor(...c):doc.setTextColor(...c);
   const txt=(s,x,yy,o={})=>{ doc.setFont("helvetica",o.b?"bold":"normal"); doc.setFontSize(o.s||10); cor(o.c||C.ink); doc.text(pdfTxt(s),x,yy,o.a?{align:o.a}:undefined); };
   const quebra=n=>{ if(y+n>H-60){ doc.addPage(); y=M; } };
-  const para=(s,o={})=>{ doc.setFont("helvetica",o.b?"bold":"normal"); doc.setFontSize(o.s||10); const ls=doc.splitTextToSize(pdfTxt(s),o.w||CW); for(const l of ls){ quebra(14); cor(o.c||C.ink); doc.text(l,o.x||M,y); y+=(o.s||10)*1.4; } };
+  const para=(s,o={})=>{ doc.setFont("helvetica",o.b?"bold":"normal"); doc.setFontSize(o.s||10); const ls=doc.splitTextToSize(pdfTxt(s),o.w||CW); if(o.b&&!o.x) quebra(44); for(const l of ls){ quebra(14); cor(o.c||C.ink); doc.text(l,o.x||M,y); y+=(o.s||10)*1.4; } };
   const secao=t=>{ quebra(50); y+=14; cor(C.gold,1); doc.rect(M,y-9,3,12,"F"); txt(t,M+10,y+1,{b:1,s:13}); y+=20; };
   // capa
   cor(C.hero,1); doc.rect(0,0,W,130,"F"); cor(C.gold,1); doc.rect(0,130,W,3,"F");
-  const img=await imgDataUrl(); if(img) doc.addImage(img,"PNG",W-M-92,18,92,100);
+  const img=await imgDataUrl(); if(img) doc.addImage(img,"JPEG",W-M-92,18,92,100);
   txt("MADE · MEU ACOMPANHAMENTO DE ECONOMIA",M,40,{b:1,s:9,c:[200,215,208]}); txt("Relatório financeiro",M,70,{b:1,s:24,c:[247,243,234]});
   txt(nomeMes.charAt(0).toUpperCase()+nomeMes.slice(1),M,94,{s:13,c:[228,193,127]});
   txt(`Gerado em ${hoje.toLocaleDateString("pt-BR")} por ${nomePet()}, seu consultor`,M,114,{s:9,c:[184,204,195]});
@@ -908,6 +928,74 @@ async function baixarPdf(btn){
   btn.disabled=false; btn.textContent=txt0;
 }
 $("btnPdf").onclick=()=>baixarPdf($("btnPdf")); $("btnPdf2").onclick=()=>baixarPdf($("btnPdf2"));
+/* compartilhar o PDF (WhatsApp, e-mail, Drive…) pelo menu do próprio celular.
+   O celular só abre esse menu logo depois de um toque, então: 1º toque monta o PDF, 2º toque envia. */
+let pdfPronto=null;
+const podeCompartilhar=()=>{ try{ return !!navigator.canShare&&navigator.canShare({files:[new File([""],"t.pdf",{type:"application/pdf"})]}); }catch(e){ return false; } };
+/* imagem do mês: cartão 1080×1350 desenhado no canvas (sem internet, na hora) */
+let domBmp=null;
+fetch("mascote-app.png").then(r=>r.blob()).then(createImageBitmap).then(b=>{ domBmp=b; }).catch(()=>{});
+function imagemMes(){
+  const W=1080,H=1350, c=document.createElement("canvas"); c.width=W; c.height=H; const g=c.getContext("2d");
+  const list=doMes(), T=totais(list), P=state.perfil, meta=P.metas[0], [yy,mm]=state.mes.split("-").map(Number);
+  const nomeMes=new Date(yy,mm-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
+  const F=(peso,tam,fam)=>`${peso} ${tam}px ${fam==="d"?'"Fraunces",Georgia,serif':'"Manrope",Arial,sans-serif'}`;
+  const ret=(x,y,w,h,r)=>{ g.beginPath(); g.roundRect(x,y,w,h,r); };
+  // fundo: verde profundo com ondas suaves, como o app
+  const bg=g.createLinearGradient(0,0,W,H); bg.addColorStop(0,"#1B5A47"); bg.addColorStop(.55,"#0B2A22"); bg.addColorStop(1,"#3A3317"); g.fillStyle=bg; g.fillRect(0,0,W,H);
+  g.lineWidth=3; for(const [y0,a,cor] of [[275,40,"rgba(228,193,127,.16)"],[760,55,"rgba(98,216,168,.12)"],[1150,45,"rgba(228,193,127,.1)"]]){ g.strokeStyle=cor; g.beginPath(); for(let x=0;x<=W;x+=12) g.lineTo(x,y0+Math.sin(x/170)*a+Math.sin(x/61)*a*.3); g.stroke(); }
+  // cartão de vidro
+  g.fillStyle="rgba(255,255,255,.08)"; g.strokeStyle="rgba(255,255,255,.18)"; g.lineWidth=2; ret(60,60,W-120,H-120,48); g.fill(); g.stroke();
+  g.textBaseline="alphabetic"; g.fillStyle="#B8CCC3"; g.font=F(800,26); g.fillText("MADE · RESUMO DO MÊS",110,150);
+  g.fillStyle="#E4C17F"; g.font=F(600,64,"d"); g.fillText(nomeMes.charAt(0).toUpperCase()+nomeMes.slice(1),110,225);
+  if(domBmp) g.drawImage(domBmp,W-110-230,95,230,249);
+  g.fillStyle="#B8CCC3"; g.font=F(700,30); g.fillText(T.saldo>=0?"SOBROU":"FALTOU",110,330);
+  g.fillStyle=T.saldo>=0?"#F7F3EA":"#FF8A80"; g.font=F(600,130,"d"); g.fillText(brl0(Math.abs(T.saldo)),104,455);
+  // entrou / saiu / supérfluo
+  const box=(x,rot,val,cor)=>{ g.fillStyle="rgba(0,0,0,.22)"; ret(x,505,280,130,26); g.fill(); g.fillStyle="#A3B8AF"; g.font=F(800,22); g.fillText(rot,x+26,550); g.fillStyle=cor; g.font=F(800,42); g.fillText(brl0(val),x+26,608); };
+  box(110,"ENTROU",T.ent,"#6FDDA9"); box(400,"SAIU",T.sai,"#FF8A80"); box(690,"SUPÉRFLUO",T.sup,"#F1B65A");
+  // barra de para onde foi
+  const base=Math.max(T.ent,T.sai)||1; let x=110; const bw=W-220;
+  g.save(); ret(110,670,bw,26,13); g.clip(); g.fillStyle="rgba(255,255,255,.12)"; g.fillRect(110,670,bw,26);
+  for(const [v,cor] of [[T.ess,"#7FD1AE"],[T.des,"#D3B176"],[T.sup,"#F0A04B"],[Math.max(T.saldo,0),"rgba(255,255,255,.4)"]]){ const w=v/base*bw; g.fillStyle=cor; g.fillRect(x,670,w,26); x+=w; } g.restore();
+  g.font=F(600,22); let lx=110; for(const [t,cor] of [["Essencial","#7FD1AE"],["Desejos","#D3B176"],["Supérfluo","#F0A04B"],["Sobrou","rgba(255,255,255,.5)"]]){ g.fillStyle=cor; g.fillRect(lx,722,18,18); g.fillStyle="#B8CCC3"; g.fillText(t,lx+28,739); lx+=g.measureText(t).width+70; }
+  // top 3 categorias
+  g.fillStyle="#F7F3EA"; g.font=F(800,30); g.fillText("Onde mais gastei",110,815);
+  Object.entries(porCat(list)).sort((a,b)=>b[1]-a[1]).slice(0,3).forEach(([cat,v],i)=>{ const yy2=870+i*58; g.fillStyle="#E8EEEA"; g.font=F(600,30); g.fillText(cat,110,yy2); g.font=F(800,30); g.textAlign="right"; g.fillStyle=catKind(cat)==="sup"?"#F1B65A":"#E8EEEA"; g.fillText(brl0(v),W-110,yy2); g.textAlign="left"; });
+  // meta (sítio)
+  if(meta){ const al=alvoReal(meta), pc=Math.min(meta.guardado/al,1);
+    g.fillStyle="#F7F3EA"; g.font=F(800,30); g.fillText(meta.nome,110,1080); g.fillStyle="#E4C17F"; g.font=F(800,30); g.textAlign="right"; g.fillText(`${brl0(meta.guardado)} de ${brl0(al)}`,W-110,1080); g.textAlign="left";
+    g.fillStyle="rgba(255,255,255,.12)"; ret(110,1102,bw,22,11); g.fill(); if(pc>0){ g.fillStyle="#E4C17F"; ret(110,1102,Math.max(bw*pc,22),22,11); g.fill(); } }
+  // frase do Dom
+  const a=P.analise&&P.analise.mes===state.mes?P.analise.r:null, frase=a?`Nota ${a.nota}/100 · ${a.titulo}`:T.sup?`Cortando metade dos supérfluos: +${brl0(T.sup/2)} por mês para guardar`:"Mês sem supérfluos. Muito bem!";
+  g.fillStyle="rgba(228,193,127,.16)"; ret(110,1165,bw,86,26); g.fill(); g.fillStyle="#F3E2B8"; g.font=F(700,28);
+  let f=`🐶 ${nomePet()}: ${frase}`; while(g.measureText(f).width>bw-50&&f.length>10) f=f.slice(0,-2); if(f!==`🐶 ${nomePet()}: ${frase}`) f=f.trim()+"…"; g.fillText(f,135,1218);
+  g.fillStyle="#7E948B"; g.font=F(600,22); g.textAlign="center"; g.fillText("mofl.com.br/made",W/2,1328); g.textAlign="left";
+  return c;
+}
+async function prepararImagem(){ await document.fonts?.ready; const c=imagemMes(); const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",0.92)); const prev=$("imgMesPrev"); if(prev.src) URL.revokeObjectURL(prev.src); prev.src=URL.createObjectURL(blob); prev.hidden=false; return blob; }
+$("btnImgSalvar").onclick=async()=>{ if(!doMes().length){ toast("Não há lançamentos neste mês."); return; } const blob=await prepararImagem(); await salvarArquivo(`MADE-${state.mes}.jpg`,blob); };
+$("btnImgShare").onclick=async()=>{
+  if(!doMes().length){ toast("Não há lançamentos neste mês."); return; }
+  const c=imagemMes(); const url=c.toDataURL("image/jpeg",0.92); const bin=atob(url.split(",")[1]); const u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+  const file=new File([u8],`MADE-${state.mes}.jpg`,{type:"image/jpeg"}); const prev=$("imgMesPrev"); prev.src=url; prev.hidden=false;
+  if(navigator.canShare?.({files:[file]})){ try{ await navigator.share({files:[file],title:"Resumo do mês · MADE"}); }catch(e){ if(e.name!=="AbortError") toast("Não deu para enviar. Use Salvar imagem."); } }
+  else await salvarArquivo(file.name,file);
+};
+$("btnPdfShare").hidden=!podeCompartilhar();
+$("btnPdfShare").onclick=async()=>{
+  const b=$("btnPdfShare");
+  if(pdfPronto&&pdfPronto.mes===state.mes&&Date.now()-pdfPronto.em<120000){
+    try{ await navigator.share({files:[pdfPronto.file],title:`Relatório MADE · ${$("mesLabel").textContent}`,text:`Relatório do mês feito pelo ${nomePet()} 🐶`}); }
+    catch(e){ if(e.name!=="AbortError") toast("Não deu para compartilhar. Tente baixar o PDF."); }
+    pdfPronto=null; b.textContent="Mandar o PDF pelo WhatsApp ou outro app"; return;
+  }
+  if(!doMes().length){ toast("Não há lançamentos neste mês."); return; }
+  b.disabled=true; b.textContent="Montando o PDF…";
+  try{ const blob=await montarPdf(); pdfPronto={mes:state.mes,em:Date.now(),file:new File([blob],`MADE-relatorio-${state.mes}.pdf`,{type:"application/pdf"})}; b.textContent="PDF pronto: toque para enviar"; }
+  catch(e){ toast("Não deu para gerar o PDF. Verifique a internet e tente de novo."); b.textContent="Mandar o PDF pelo WhatsApp ou outro app"; }
+  b.disabled=false;
+};
 $("btnCsv").onclick=()=>{
   if(!state.tx.length){ toast("Nada para exportar ainda."); return; }
   const q=s=>'"'+String(s??"").replace(/"/g,'""')+'"';
@@ -1327,7 +1415,7 @@ function renderDom(){
     const msgs=d.msgs.length?d.msgs:[{r:"d",t:`Oi! Eu sou o ${nomePet()} 🐶\nMe conte seus gastos do jeito que quiser: "gastei 42 no iFood", "recebi 3200 de salário", "meu aluguel é 1100 todo dia 5". Pode falar no microfone dourado. Eu anoto tudo e lembro da nossa conversa.`,em:Date.now()}];
     box.innerHTML=msgs.map((m,i)=>m.r==="u"
       ? `<div class="dm me"><div class="b">${esc(m.t)}<span class="hora">${horaDe(m.em)}</span></div></div>`
-      : `<div class="dm"><span class="avatar" style="background-image:url(mascote-app.png)"></span><div class="b">${esc(m.t)}${(m.acoes||[]).length?`<div class="acoes">${m.acoes.map((a,k)=>`<div class="acao ${a.desfeita?"desfeita":""}"><span>✓ ${esc(a.txt)}</span>${a.undo&&!a.desfeita?`<button type="button" data-undo="${i}:${k}">Desfazer</button>`:""}</div>`).join("")}</div>`:""}<span class="hora">${horaDe(m.em)}</span></div></div>`).join("")
+      : `<div class="dm"><span class="avatar" style="background-image:url(mascote-app.png)"></span><div class="b">${esc(m.t)}${(m.acoes||[]).length?`<div class="acoes">${m.acoes.map((a,k)=>`<div class="acao ${a.desfeita?"desfeita":""}"><span>✓ ${esc(a.txt)}</span>${a.undo&&!a.desfeita?`<button type="button" data-undo="${i}:${k}">Desfazer</button>`:""}</div>`).join("")}</div>`:""}${m.resumo?htmlConta(m.resumo):""}<span class="hora">${horaDe(m.em)}</span></div></div>`).join("")
       + (d.pensando?`<div class="dm"><span class="avatar" style="background-image:url(mascote-app.png)"></span><div class="b digitando" aria-label="${esc(nomePet())} está pensando"><span></span><span></span><span></span></div></div>`:"");
     box.querySelectorAll("[data-undo]").forEach(b=>b.onclick=()=>{ const [i,k]=b.dataset.undo.split(":").map(Number); desfazer(i,k); });
     if(state.tela==="dom") requestAnimationFrame(()=>box.lastElementChild?.scrollIntoView({block:"end"}));
@@ -1341,6 +1429,26 @@ function renderDom(){
     lista.querySelectorAll("[data-tirafixo]").forEach(b=>b.onclick=()=>{ if(b.dataset.armed){ state.perfil.fixos=state.perfil.fixos.filter(f=>f.id!==b.dataset.tirafixo); salvarPerfil(true); render(); } else { b.dataset.armed="1"; b.textContent="Confirmar"; } });
   }
   renderVoz();
+}
+
+/* a conta do mês logo depois que o Dom anota algo (calculada no app, não pela IA) */
+function contaDoMes(feitas){
+  const mes=ymd(hoje).slice(0,7), list=doMes(mes), T=totais(list), P=state.perfil, h=T.ent?hojeInfo(T):null;
+  const cats=new Set(); for(const a of feitas){ const t=a.undo?.k==="tx"?state.tx.find(x=>x.id===a.undo.id):null; if(t?.cat) cats.add(t.cat); if(a.undo?.k==="limite") cats.add(a.undo.c); }
+  const gasto=porCat(list), limites=[...cats].filter(c=>P.limites[c]).map(c=>({c,g:Math.round(gasto[c]||0),l:P.limites[c]}));
+  const meta=P.metas[0];
+  return {mes,ent:T.ent,sai:T.sai,saldo:T.saldo,sup:T.sup,resta:h?Math.round(h.resta):null,guardar:h?h.guardar:0,limites,
+    meta:meta?{nome:meta.nome,g:meta.guardado,a:Math.round(alvoReal(meta))}:null};
+}
+function htmlConta(r){
+  const cel=(rot,val,cls)=>`<div><span class="tiny muted">${rot}</span><b class="${cls||""}">${val}</b></div>`;
+  return `<div class="conta">
+    <div class="conta-t">Como está ${new Date(r.mes+"-02").toLocaleDateString("pt-BR",{month:"long"})}</div>
+    <div class="conta-g">${cel("Entrou",brl0(r.ent),"pos")}${cel("Saiu",brl0(r.sai),"neg")}${cel(r.saldo>=0?"Sobra":"Falta",brl0(Math.abs(r.saldo)),r.saldo>=0?"":"neg")}${cel("Supérfluo",brl0(r.sup),"wrn")}</div>
+    ${r.resta!=null?`<div class="conta-l">${r.resta>=0?`Hoje ainda dá pra gastar <b>${brl0(r.resta)}</b> e guardar ${brl0(r.guardar)} no mês`:`Hoje passou <b class="neg">${brl0(-r.resta)}</b> do ideal do dia`}</div>`:`<div class="conta-l tiny muted">Anote o que entrou no mês para eu calcular quanto dá pra gastar por dia.</div>`}
+    ${r.limites.map(x=>`<div class="conta-l">${esc(x.c)}: <b class="${x.g>=x.l?"neg":x.g>=x.l*.8?"wrn":""}">${brl0(x.g)}</b> de ${brl0(x.l)}${x.g<x.l?` · restam ${brl0(x.l-x.g)}`:" · passou do limite"}</div>`).join("")}
+    ${r.meta?`<div class="conta-l">${esc(r.meta.nome)}: ${brl0(r.meta.g)} de ${brl0(r.meta.a)}</div>`:""}
+  </div>`;
 }
 
 /* gastos fixos: lança sozinho no mês, uma vez */
@@ -1453,7 +1561,9 @@ Responda SOMENTE com JSON:
     const feitas=[];
     for(const a of (Array.isArray(r?.acoes)?r.acoes:[]).slice(0,12)){ try{ const x=await aplicarAcao(a); if(x) feitas.push(x); }catch(e){} }
     const resposta=String(r?.resposta||"").trim()||(feitas.length?"Anotado!":"Não entendi bem. Pode repetir?");
-    d.msgs.push({r:"d",t:resposta,em:Date.now(),acoes:feitas});
+    let resumo=null;
+    if(feitas.some(x=>["tx","fixo","guardar","limite"].includes(x.undo?.k))){ await new Promise(r=>setTimeout(r,350)); resumo=contaDoMes(feitas); }
+    d.msgs.push({r:"d",t:resposta,em:Date.now(),acoes:feitas,resumo});
     if(state.perfil.domVoz) falar(resposta);
   }catch(e){
     d.msgs.push({r:"d",t:e.code==="invalid_json"?"Me enrolei aqui. Pode repetir?":erroIA(e),em:Date.now()}); semIA(e);
