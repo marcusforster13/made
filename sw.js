@@ -1,5 +1,5 @@
 // Guarda o app no celular para abrir rápido e funcionar sem internet (a IA precisa de internet).
-const CACHE = "made-v2";
+const CACHE = "made-v3";
 const ARQUIVOS = ["./", "index.html", "standalone.js", "mascote-app.png", "icone-192.png", "icone-512.png", "manifest.webmanifest"];
 
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARQUIVOS))); self.skipWaiting(); });

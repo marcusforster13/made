@@ -165,6 +165,39 @@ nav.bottom .plus svg{width:28px;height:28px;stroke-width:2.4}
 .prev label.tx{grid-template-columns:28px 40px minmax(0,1fr) auto;cursor:pointer}
 .prev input[type=checkbox]{width:22px;height:22px;min-height:0;accent-color:var(--accent)}
 .chat{display:grid;gap:10px;max-height:420px;overflow:auto}
+/* Dom (agente) */
+.nav-dom{width:26px;height:26px;border-radius:50%;background:var(--gold-soft) url(mascote-app.png) center 18%/150% no-repeat;border:1.5px solid currentColor}
+.dom-head{display:flex;align-items:center;gap:12px}
+.dom-head img{width:70px;height:auto;flex:none;filter:drop-shadow(0 8px 14px rgba(0,0,0,.45));animation:bob 4.5s ease-in-out infinite}
+.dom-head .eye{margin-left:auto;flex:none}
+.dom-head .eye[aria-pressed="true"]{color:var(--gold);border-color:rgba(228,193,127,.5)}
+.dom-head .eye[aria-pressed="false"] #domVozOnda{opacity:.25}
+.dom-chat{display:grid;gap:12px;align-content:start;min-height:30vh}
+.dm{display:grid;grid-template-columns:34px minmax(0,1fr);gap:8px;align-items:end}
+.dm .avatar{width:34px;height:34px}
+.dm.me{grid-template-columns:minmax(0,1fr)}
+.dm .b{padding:12px 14px;border-radius:18px 18px 18px 6px;background:var(--surface);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--line);white-space:pre-wrap;overflow-wrap:anywhere;font-size:.97rem;max-width:92%;justify-self:start}
+.dm.me .b{background:var(--accent);color:var(--accent-ink);border-color:transparent;border-radius:18px 18px 6px 18px;justify-self:end}
+.dm .hora{font-size:.68rem;color:var(--muted);margin-top:4px;display:block}
+.dm.me .hora{color:rgba(3,20,13,.6);text-align:right}
+.acoes{display:grid;gap:6px;margin-top:8px}
+.acao{display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--accent-soft);border-radius:12px;padding:6px 6px 6px 10px;font-size:.84rem;font-weight:600}
+.acao.desfeita{opacity:.5;text-decoration:line-through}
+.acao button{min-height:32px;padding:2px 10px;font-size:.78rem;white-space:nowrap;flex:none}
+.digitando span{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:4px;animation:pisca 1.2s infinite}
+.digitando span:nth-child(2){animation-delay:.2s}.digitando span:nth-child(3){animation-delay:.4s}
+@keyframes pisca{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.dom-bar{position:sticky;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:5;display:flex;gap:8px;align-items:center;padding:6px;border-radius:26px;background:rgba(10,28,23,.82);-webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.dom-bar input{border:0;background:transparent;flex:1;min-height:44px;padding:8px 6px;font-size:1rem}
+.dom-bar input:focus-visible{outline:none}
+.dom-bar button{min-height:44px;min-width:44px;padding:0 12px;border-radius:22px;display:grid;place-items:center}
+.mic{width:48px;height:48px;border-radius:50% !important;background:radial-gradient(circle at 30% 25%,#FBE7B8,var(--gold) 60%,#B08A44);border:0;color:#1B1408;padding:0 !important;flex:none}
+.mic svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.mic.ouvindo{animation:ouvindo 1.1s ease-in-out infinite}
+@keyframes ouvindo{0%,100%{box-shadow:0 0 0 0 rgba(228,193,127,.6)}50%{box-shadow:0 0 0 12px rgba(228,193,127,0)}}
+.fixo{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;font-size:.92rem}
+.fixo button{min-height:34px;padding:2px 10px;font-size:.78rem}
+@media (prefers-reduced-motion:reduce){.dom-head img,.mic.ouvindo{animation:none}}
 .msg{padding:12px 14px;border-radius:16px;max-width:88%;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.95rem}
 .msg.me{background:var(--accent);color:var(--accent-ink);justify-self:end;border-bottom-right-radius:4px}
 .msg.ai{background:var(--surface2);border-bottom-left-radius:4px}
@@ -364,6 +397,12 @@ a.linkbtn::after{content:"↗";color:var(--gold);font-weight:800}
       <button class="gold block" id="btnPdf">Baixar relatório do mês (PDF)</button>
       <button class="block" id="btnCsv">Baixar planilha de gastos (CSV)</button>
       <span class="small muted" id="relStatus"></span>
+      <div id="emailBox" style="display:grid;gap:10px;border-top:1px solid var(--line);padding-top:14px">
+        <h3>Relatório por e-mail</h3>
+        <span class="small muted" id="emailInfo">Conferindo…</span>
+        <label class="switch" style="background:var(--surface2)"><span>Mandar toda semana<span class="tiny muted" style="display:block;font-weight:500">Na primeira vez que você abrir o app a partir de segunda-feira</span></span><input type="checkbox" id="emailAuto"></label>
+        <button class="block" id="btnEmail">Mandar relatório por e-mail agora</button>
+      </div>
     </section>
 
     <section class="card">
@@ -374,18 +413,9 @@ a.linkbtn::after{content:"↗";color:var(--gold);font-weight:800}
     </section>
 
     <section class="card">
-      <div class="row"><span class="avatar" style="background-image:url(mascote-app.png)"></span><div><span class="advisor-tag">Converse</span><h2 style="margin-top:4px">Pergunte ao consultor</h2></div></div>
-      <div class="chips" id="sugs">
-        <button>Onde estou gastando demais?</button>
-        <button>Quanto posso guardar sem sofrer?</button>
-        <button>Como chegar mais rápido no sítio?</button>
-        <button>Me ajuda a sair do vermelho</button>
-      </div>
-      <div class="chat" id="chat"></div>
-      <form id="fChat" class="row">
-        <input id="chatTxt" autocomplete="off" placeholder="Escreva sua pergunta" aria-label="Pergunta">
-        <button class="primary" type="submit" id="chatBtn">Enviar</button>
-      </form>
+      <div class="row"><span class="avatar" style="background-image:url(mascote-app.png)"></span><div><span class="advisor-tag">Converse</span><h2 style="margin-top:4px">Fale com o Dom</h2></div></div>
+      <p class="small muted" style="margin:0">Pergunte qualquer coisa ou conte seus gastos por voz. Ele anota, cadastra seus gastos fixos e lembra da conversa.</p>
+      <button class="primary block" data-go="dom">Abrir conversa com o Dom</button>
     </section>
 
     <details>
@@ -440,6 +470,29 @@ a.linkbtn::after{content:"↗";color:var(--gold);font-weight:800}
     </details>
     <p class="disc">O consultor usa a IA do Claude com a sua conta e só vê o que está neste app, nunca o seu banco. É orientação educativa, não substitui um planejador financeiro certificado.</p>
   </main>
+
+  <!-- DOM (AGENTE) -->
+  <main class="screen" id="s-dom" hidden>
+    <section class="dom-head">
+      <img src="mascote-app.png" alt="" width="70" height="76">
+      <div style="min-width:0"><h2 class="serif" id="domNome" style="font-size:1.45rem">Dom</h2><span class="tiny muted" id="domStatus">Conte seus gastos, falando ou escrevendo. Eu anoto e lembro de tudo.</span></div>
+      <button class="eye" id="domVoz" type="button" aria-pressed="false" aria-label="Dom ler as respostas em voz alta"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6" id="domVozOnda"/></svg></button>
+    </section>
+    <div class="chips" id="domSugs">
+      <button type="button">Meus gastos fixos são: aluguel 1100 dia 5, internet 100 dia 10</button>
+      <button type="button">Gastei 42 no iFood hoje</button>
+      <button type="button">Recebi meu salário de 3200</button>
+      <button type="button">Guardei 200 pro sítio</button>
+      <button type="button">Como estou este mês?</button>
+    </div>
+    <details id="fixosBox"><summary><span>Gastos fixos do mês <span class="tiny muted" id="fixosTot"></span></span></summary><div class="inner" id="fixosLista"></div></details>
+    <div class="dom-chat" id="domChat" aria-live="polite"></div>
+    <form class="dom-bar" id="fDom">
+      <button type="button" class="mic" id="domMic" aria-label="Falar com o Dom"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+      <input id="domTxt" autocomplete="off" placeholder="Fale ou escreva para o Dom" aria-label="Mensagem para o Dom">
+      <button class="primary" id="domEnviar" type="submit" aria-label="Enviar"><svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M4 12l16-8-6 16-2-6z"/></svg></button>
+    </form>
+  </main>
 </div>
 
 <nav class="bottom" aria-label="Navegação">
@@ -447,8 +500,8 @@ a.linkbtn::after{content:"↗";color:var(--gold);font-weight:800}
     <button data-s="inicio" aria-current="page"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>Início</button>
     <button data-s="gastos"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Gastos</button>
     <button class="plus" id="abrirAdd" aria-label="Anotar gasto ou ganho"><span><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></button>
+    <button data-s="dom"><span class="nav-dom" aria-hidden="true"></span>Dom</button>
     <button data-s="metas"><svg viewBox="0 0 24 24"><path d="M3 20l6-9 4 5 3-4 5 8z"/><circle cx="17" cy="6" r="2"/></svg>Sítio</button>
-    <button data-s="consultor"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/><path d="M12 15l-1.5 3 1.5 1.5 1.5-1.5z"/></svg>Consultor</button>
   </div>
 </nav>
 
@@ -459,7 +512,7 @@ a.linkbtn::after{content:"↗";color:var(--gold);font-weight:800}
     <div class="grab"></div>
     <div class="between"><h2 id="addTit" class="serif" style="font-size:1.4rem">Anotar</h2><button class="ghost" data-fechar>Fechar</button></div>
     <form class="ai-box" id="fRapido">
-      <div class="row"><span class="spark" aria-hidden="true">IA</span><input id="qTexto" autocomplete="off" placeholder="Escreva do seu jeito: “ifood 42 ontem”" aria-label="Escreva o que gastou"></div>
+      <div class="row"><span class="spark" aria-hidden="true">IA</span><button type="button" class="mic" id="qMic" aria-label="Ditar por voz" style="width:40px;height:40px"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><input id="qTexto" autocomplete="off" placeholder="Escreva do seu jeito: “ifood 42 ontem”" aria-label="Escreva o que gastou"></div>
       <button class="primary block" type="submit" id="qBtn">Anotar</button>
       <div class="small muted" id="qStatus">Pode colocar vários: “uber 18, almoço 32 no débito, recebi 200 de bico”.</div>
     </form>
@@ -594,12 +647,12 @@ const inicial = c => (c||"?").replace(/[^A-Za-zÀ-ú]/g,"").slice(0,1).toUpperCa
 
 const state = {
   tx: [],
-  perfil: {reserva:0, meses:6, aporte:0, taxa:11, anos:5, autoAnalise:true, guardarMes:0, mascote:"", semanal:null, analise:null, limites:{}, dividas:[], extraDivida:0,
+  perfil: {reserva:0, meses:6, aporte:0, taxa:11, anos:5, autoAnalise:true, guardarMes:0, fixos:[], emailSemanal:false, emailUltimo:"", mascote:"", semanal:null, analise:null, limites:{}, dividas:[], extraDivida:0,
     metas:[{id:"sitio",nome:"Sítio",alvo:200000,guardado:0,anos:8,inflacao:true,exemplo:true}]},
   mes: ymd(hoje).slice(0,7), tela:"inicio", tipo:"saida", cat:"Mercado", pag:"Pix", diaOff:0,
   filtro:"todos", vis:"lista", aberto:null, verTodosAlertas:false,
   modo:"carregando", txCol:null, perfilRef:null,
-  sample:null, carregado:{tx:false,perfil:false}, autoFeito:false, analisando:false, chat:[], importar:[]
+  sample:null, carregado:{tx:false,perfil:false}, autoFeito:false, analisando:false, importar:[], dom:{msgs:[],ref:null,v:0,visto:-1,pensando:false}, email:{ok:false,para:""}, fixosFeito:false, emailFeito:false
 };
 
 function exemplos(){
@@ -646,13 +699,13 @@ function planoDividas(dividas, extra, metodo){
 }
 
 /* ---------- navegação ---------- */
-const TITULOS={inicio:"Início",gastos:"Gastos",metas:"Sítio e metas",consultor:"Consultor"};
+const TITULOS={inicio:"Início",gastos:"Gastos",metas:"Sítio e metas",consultor:"Consultor",dom:"Dom"};
 function irPara(t, ancora){
   state.tela=t;
   for(const s of Object.keys(TITULOS)) $("s-"+s).hidden = s!==t;
   document.querySelectorAll("nav.bottom [data-s]").forEach(b=>{ if(b.dataset.s===t) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   $("titulo").textContent=TITULOS[t];
-  if(ancora) setTimeout(()=>$(ancora)?.scrollIntoView({behavior:"smooth",block:"start"}),30); else window.scrollTo(0,0);
+  if(ancora) setTimeout(()=>$(ancora)?.scrollIntoView({behavior:"smooth",block:"start"}),30); else if(t==="dom") setTimeout(()=>$("domChat").lastElementChild?.scrollIntoView({block:"end"}),30); else window.scrollTo(0,0);
   try{ localStorage.setItem("tela",t); }catch(e){}
 }
 document.querySelectorAll("nav.bottom [data-s]").forEach(b=>b.onclick=()=>irPara(b.dataset.s));
@@ -688,7 +741,7 @@ function render(){
   $("bannerGap").style.height = b.hidden?"0":"14px";
   $("boasVindas").hidden = !(state.modo==="db" && state.carregado.tx && !state.tx.length);
 
-  renderPet(T); renderSemana(); renderAjustes();
+  renderPet(T); renderSemana(); renderAjustes(); renderDom(); renderEmail();
   renderAlertas(list,T); renderMiniAnalise(); renderOrcMini(list,T); renderMetaMini(T);
   renderLista(list); renderCats(list);
   renderReserva(T); renderMetas(T);
@@ -1106,6 +1159,7 @@ ${metas||"nenhuma"}
 Dívidas:
 ${dividas||"nenhuma cadastrada"}
 Limites de orçamento: ${lim||"nenhum"}
+Gastos fixos todo mês: ${(P.fixos||[]).map(f=>`${f.nome} ${f.valor} (dia ${f.dia}, ${f.cat})`).join("; ")||"nenhum cadastrado"}
 Meses anteriores:
 ${hist||"sem dados"}
 Lançamentos do mês (data | tipo | valor | categoria | descrição | pagamento | marcado):
@@ -1118,7 +1172,7 @@ function semIA(e){ if(e&&(e.code==="not_granted"||e.code==="sampling_disabled"))
 function renderIAEstado(){
   const on=!!state.sample;
   $("btnAnalisar").disabled=!on||state.analisando; $("btnAnalisar").textContent=state.analisando?"Analisando…":state.perfil.analise?.mes===state.mes?"Atualizar diagnóstico":"Fazer diagnóstico agora";
-  $("chatBtn").disabled=!on; $("autoAnalise").checked=!!state.perfil.autoAnalise; $("autoAnalise").disabled=!on;
+  $("domEnviar").disabled=!on||state.dom.pensando; $("domMic").hidden=!on||!Reconhecer; $("qMic").hidden=!Reconhecer; $("autoAnalise").checked=!!state.perfil.autoAnalise; $("autoAnalise").disabled=!on;
   $("btnLer").disabled=!on;
   if(!on && state.modo!=="carregando" && !$("impStatus").textContent) $("impStatus").textContent="A leitura por IA precisa da IA do Dom, que ainda não está ligada neste app.";
 }
@@ -1257,39 +1311,250 @@ $("btnImportar").onclick=async()=>{
 };
 $("btnCancelarImp").onclick=()=>{ state.importar=[]; $("impPrev").hidden=true; $("impStatus").textContent=""; };
 
-/* chat */
-function renderChat(){ $("chat").innerHTML=state.chat.map(m=>`<div class="msg ${m.role==="user"?"me":"ai"}">${esc(m.content)}</div>`).join(""); $("chat").scrollTop=$("chat").scrollHeight; }
-async function perguntar(q){
-  if(!state.sample||!q) return;
-  state.chat.push({role:"user",content:q}); state.chat.push({role:"assistant",content:"Pensando…"}); renderChat();
-  const bolha=$("chat").lastElementChild; $("chatBtn").disabled=true;
-  const regras=`Você é ${nomePet()}, o consultor financeiro pessoal do app MADE (um cachorro marrom de boné vermelho): um economista brasileiro experiente que explica tudo de forma simples para quem não entende de finanças. Frases curtas, sem jargão, sem julgamento. Use os números reais abaixo e faça contas quando ajudar. No máximo 8 itens ou parágrafos curtos, sem tabelas. Conteúdo educativo: não indique produtos de instituições específicas.
-
-${contexto()}`;
-  const lim=await state.sample.limits?.().catch(()=>null);
-  const feitos=[], regrasAcao = lim?.tools ? `\n\nVocê também pode AGIR no app com as ferramentas: anotar lançamentos quando a pessoa contar um gasto ou ganho, guardar dinheiro numa meta quando ela disser que guardou, e definir limite de orçamento quando ela pedir. Só aja quando a pessoa pedir ou contar algo concreto; depois confirme em uma frase o que fez.` : "";
-  const turns=[{role:"user",content:regras+regrasAcao},{role:"assistant",content:"Entendi seus dados. Pode perguntar."},...state.chat.slice(0,-1).slice(-10)];
-  const tools = lim?.tools ? [
-    {name:"anotar_lancamentos",description:"Salva um ou mais lançamentos (gastos ou ganhos) no app. Retorna quantos foram salvos.",
-     inputSchema:{type:"object",properties:{itens:{type:"array",items:{type:"object",properties:{data:{type:"string",description:"AAAA-MM-DD"},tipo:{type:"string",enum:["entrada","saida"]},valor:{type:"number"},desc:{type:"string"},cat:{type:"string",description:"Uma de: "+CATS.saida.map(c=>c[0]).join(", ")+" (saída) ou "+CATS.entrada.map(c=>c[0]).join(", ")+" (entrada)"},pag:{type:"string",enum:PAGS},superfluo:{type:"boolean"}},required:["tipo","valor"]}}},required:["itens"]},
-     async execute({itens}){ const l=(Array.isArray(itens)?itens:[]).map(normalizar).filter(t=>t.valor>0); for(const t of l) await adicionar(t); feitos.push(`${l.length} lançamento(s) anotado(s)`); return {salvos:l.length}; }},
-    {name:"guardar_na_meta",description:"Soma um valor guardado a uma meta (ex.: Sítio) ou à reserva de emergência (meta='reserva'). Retorna o novo total.",
-     inputSchema:{type:"object",properties:{meta:{type:"string"},valor:{type:"number"}},required:["meta","valor"]},
-     execute({meta,valor}){ const v=Math.abs(parseNum(valor)); if(!v) throw new Error("valor inválido"); const P=state.perfil; const n=String(meta||"").toLowerCase();
-       if(n.includes("reserva")){ P.reserva=Math.round((P.reserva+v)*100)/100; salvarPerfil(true); render(); feitos.push(`+${brl0(v)} na reserva`); return {reserva:P.reserva}; }
-       const m=P.metas.find(x=>x.nome.toLowerCase().includes(n))||P.metas[0]; if(!m) throw new Error("nenhuma meta criada");
-       m.guardado=Math.round((m.guardado+v)*100)/100; delete m.exemplo; salvarPerfil(true); render(); feitos.push(`+${brl0(v)} em ${m.nome}`); return {meta:m.nome,guardado:m.guardado,alvo:alvoReal(m)}; }},
-    {name:"definir_limite",description:"Define o limite mensal de gasto de uma categoria do orçamento. Valor 0 remove o limite.",
-     inputSchema:{type:"object",properties:{categoria:{type:"string"},valor:{type:"number"}},required:["categoria","valor"]},
-     execute({categoria,valor}){ const c=CATS.saida.map(x=>x[0]).find(x=>x.toLowerCase()===String(categoria).toLowerCase()); if(!c) throw new Error("categoria desconhecida"); const v=parseNum(valor);
-       if(v>0) state.perfil.limites[c]=v; else delete state.perfil.limites[c]; salvarPerfil(true); render(); feitos.push(`limite de ${c}: ${v>0?brl0(v):"removido"}`); return {ok:true}; }}
-  ] : undefined;
-  try{ const {text}=await state.sample(turns,{...(tools?{tools}:{cache:false}),onText:({text})=>{ bolha.textContent=text; $("chat").scrollTop=$("chat").scrollHeight; }}); state.chat.at(-1).content=text+(feitos.length?"\n\n✓ "+feitos.join(" · "):""); }
-  catch(e){ state.chat.at(-1).content=e.text||erroIA(e); semIA(e); }
-  renderChat(); $("chatBtn").disabled=!state.sample;
+/* Dom: agente que conversa, anota e lembra */
+const Reconhecer = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+const MAX_MSGS = 80;
+const horaDe = ms => new Date(ms).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+function salvarChat(){
+  const d=state.dom; d.v++; d.msgs=d.msgs.slice(-MAX_MSGS);
+  if(state.modo==="db"&&d.ref) d.ref.set({msgs:JSON.parse(JSON.stringify(d.msgs))}).catch(()=>toast("Não deu para guardar a conversa."));
 }
-$("fChat").addEventListener("submit",e=>{ e.preventDefault(); const q=$("chatTxt").value.trim(); $("chatTxt").value=""; perguntar(q); });
-$("sugs").querySelectorAll("button").forEach(b=>b.onclick=()=>perguntar(b.textContent));
+function renderDom(){
+  $("domNome").textContent=nomePet();
+  const d=state.dom, box=$("domChat");
+  if(d.visto!==d.v){
+    d.visto=d.v;
+    const msgs=d.msgs.length?d.msgs:[{r:"d",t:`Oi! Eu sou o ${nomePet()} 🐶\nMe conte seus gastos do jeito que quiser: "gastei 42 no iFood", "recebi 3200 de salário", "meu aluguel é 1100 todo dia 5". Pode falar no microfone dourado. Eu anoto tudo e lembro da nossa conversa.`,em:Date.now()}];
+    box.innerHTML=msgs.map((m,i)=>m.r==="u"
+      ? `<div class="dm me"><div class="b">${esc(m.t)}<span class="hora">${horaDe(m.em)}</span></div></div>`
+      : `<div class="dm"><span class="avatar" style="background-image:url(mascote-app.png)"></span><div class="b">${esc(m.t)}${(m.acoes||[]).length?`<div class="acoes">${m.acoes.map((a,k)=>`<div class="acao ${a.desfeita?"desfeita":""}"><span>✓ ${esc(a.txt)}</span>${a.undo&&!a.desfeita?`<button type="button" data-undo="${i}:${k}">Desfazer</button>`:""}</div>`).join("")}</div>`:""}<span class="hora">${horaDe(m.em)}</span></div></div>`).join("")
+      + (d.pensando?`<div class="dm"><span class="avatar" style="background-image:url(mascote-app.png)"></span><div class="b digitando" aria-label="${esc(nomePet())} está pensando"><span></span><span></span><span></span></div></div>`:"");
+    box.querySelectorAll("[data-undo]").forEach(b=>b.onclick=()=>{ const [i,k]=b.dataset.undo.split(":").map(Number); desfazer(i,k); });
+    if(state.tela==="dom") requestAnimationFrame(()=>box.lastElementChild?.scrollIntoView({block:"end"}));
+  }
+  const lista=$("fixosLista");
+  if(!lista.contains(document.activeElement)){
+    const F=state.perfil.fixos||[], tot=F.reduce((s,f)=>s+f.valor,0);
+    $("fixosTot").textContent=F.length?`· ${F.length} · ${brl0(tot)}/mês`:"";
+    lista.innerHTML=F.length?F.map(f=>`<div class="fixo"><span><b style="font-weight:600">${esc(f.nome)}</b><span class="tiny muted" style="display:block">${esc(f.cat)} · todo dia ${f.dia}</span></span><b>${brl0(f.valor)}</b><button type="button" class="ghost" data-tirafixo="${esc(f.id)}" style="color:var(--bad)">Tirar</button></div>`).join("")
+      :`<span class="small muted">Nenhum ainda. Conte ao ${esc(nomePet())}: "meu aluguel é 1100 todo dia 5". Ele lança sozinho todo mês.</span>`;
+    lista.querySelectorAll("[data-tirafixo]").forEach(b=>b.onclick=()=>{ if(b.dataset.armed){ state.perfil.fixos=state.perfil.fixos.filter(f=>f.id!==b.dataset.tirafixo); salvarPerfil(true); render(); } else { b.dataset.armed="1"; b.textContent="Confirmar"; } });
+  }
+  renderVoz();
+}
+
+/* gastos fixos: lança sozinho no mês, uma vez */
+const lancandoFixo=new Set();
+async function lancarFixos(){
+  if(state.modo==="carregando") return;
+  const m=ymd(hoje).slice(0,7), dia=hoje.getDate();
+  for(const f of state.perfil.fixos||[]){
+    const chave=m+":"+f.id;
+    if(f.dia>dia||lancandoFixo.has(chave)||state.tx.some(t=>t.fixo===f.id&&t.data.startsWith(m))) continue;
+    lancandoFixo.add(chave);
+    await adicionar({tipo:"saida",valor:f.valor,desc:f.nome,cat:f.cat,data:m+"-"+String(Math.min(f.dia,28)).padStart(2,"0"),superfluo:catKind(f.cat)==="sup",pag:f.pag||"Boleto",fixo:f.id,criado:Date.now()});
+  }
+}
+function depoisDeCarregar(){
+  if(!state.carregado.tx||!state.carregado.perfil) return;
+  if(!state.fixosFeito){ state.fixosFeito=true; lancarFixos(); }
+  if(!state.emailFeito){ state.emailFeito=true; statusEmail().then(talvezEmail); }
+}
+
+/* ações que o Dom pode fazer no app */
+async function aplicarAcao(a){
+  const P=state.perfil, tipo=String(a?.tipo||"");
+  if(tipo==="lancamento"){
+    const t=normalizar({...a,tipo:a.tipo_mov==="entrada"?"entrada":"saida"}); if(!(t.valor>0)) return null;
+    const id=await adicionar(t); if(!id) return null;
+    if(t.tipo==="entrada") setTimeout(()=>abrirPlano({...t,id}),600);
+    return {txt:`${t.tipo==="entrada"?"Entrada":"Gasto"}: ${t.desc||t.cat} ${brl(t.valor)} (${t.cat}${t.superfluo?", supérfluo":""})`,undo:{k:"tx",id}};
+  }
+  if(tipo==="fixo"){
+    const cats=CATS.saida.map(c=>c[0]), cat=cats.includes(a.cat)?a.cat:"Contas da casa", valor=Math.round(Math.abs(parseNum(a.valor))*100)/100;
+    if(!(valor>0)) return null;
+    const f={id:"f"+Date.now().toString(36)+Math.random().toString(36).slice(2,5),nome:String(a.nome||cat).slice(0,40),valor,cat,dia:Math.min(Math.max(parseInt(a.dia)||1,1),31),pag:PAGS.includes(a.pag)?a.pag:"Boleto"};
+    P.fixos=[...(P.fixos||[]),f]; salvarPerfil(true); setTimeout(lancarFixos,300);
+    return {txt:`Gasto fixo: ${f.nome} ${brl0(f.valor)} todo dia ${f.dia}`,undo:{k:"fixo",id:f.id}};
+  }
+  if(tipo==="remover_fixo"){
+    const n=String(a.nome||"").toLowerCase(), f=(P.fixos||[]).find(x=>x.nome.toLowerCase().includes(n)); if(!f||!n) return null;
+    P.fixos=P.fixos.filter(x=>x!==f); salvarPerfil(true);
+    return {txt:`Tirei o gasto fixo ${f.nome}`,undo:{k:"fixo_volta",item:f}};
+  }
+  if(tipo==="guardar"){
+    const v=Math.round(Math.abs(parseNum(a.valor))*100)/100, n=String(a.meta||"").toLowerCase(); if(!(v>0)) return null;
+    if(n.includes("reserva")){ P.reserva=Math.round((P.reserva+v)*100)/100; salvarPerfil(true); return {txt:`+${brl0(v)} na reserva de emergência`,undo:{k:"guardar",alvo:"reserva",v}}; }
+    const m=P.metas.find(x=>n&&x.nome.toLowerCase().includes(n))||P.metas[0]; if(!m) return null;
+    m.guardado=Math.round((m.guardado+v)*100)/100; delete m.exemplo; salvarPerfil(true);
+    return {txt:`+${brl0(v)} em ${m.nome} (agora ${brl0(m.guardado)})`,undo:{k:"guardar",alvo:m.id,v}};
+  }
+  if(tipo==="limite"){
+    const c=CATS.saida.map(x=>x[0]).find(x=>x.toLowerCase()===String(a.categoria||"").toLowerCase()); if(!c) return null;
+    const v=Math.round(parseNum(a.valor)), prev=P.limites[c]||0;
+    if(v>0) P.limites[c]=v; else delete P.limites[c]; salvarPerfil(true);
+    return {txt:v>0?`Limite de ${c}: ${brl0(v)} por mês`:`Limite de ${c} removido`,undo:{k:"limite",c,prev}};
+  }
+  if(tipo==="divida"){
+    const d={id:"d"+Date.now().toString(36),nome:String(a.nome||"Dívida").slice(0,40),saldo:Math.abs(parseNum(a.saldo)),juros:Math.abs(parseNum(a.juros)),parcela:Math.abs(parseNum(a.parcela))};
+    if(!(d.saldo>0)) return null; P.dividas=[...P.dividas,d]; salvarPerfil(true);
+    return {txt:`Dívida anotada: ${d.nome} ${brl0(d.saldo)}${d.juros?`, ${fmtIn(d.juros)}% ao mês`:""}`,undo:{k:"divida",id:d.id}};
+  }
+  return null;
+}
+async function desfazer(i,k){
+  const a=state.dom.msgs[i]?.acoes?.[k]; if(!a||a.desfeita||!a.undo) return;
+  const u=a.undo, P=state.perfil;
+  if(u.k==="tx") await apagar(u.id);
+  if(u.k==="fixo"){ P.fixos=(P.fixos||[]).filter(f=>f.id!==u.id); for(const t of state.tx.filter(t=>t.fixo===u.id&&t.data.startsWith(ymd(hoje).slice(0,7)))) await apagar(t.id); }
+  if(u.k==="fixo_volta") P.fixos=[...(P.fixos||[]),u.item];
+  if(u.k==="guardar"){ if(u.alvo==="reserva") P.reserva=Math.max(0,Math.round((P.reserva-u.v)*100)/100); else { const m=P.metas.find(x=>x.id===u.alvo); if(m) m.guardado=Math.max(0,Math.round((m.guardado-u.v)*100)/100); } }
+  if(u.k==="limite"){ if(u.prev) P.limites[u.c]=u.prev; else delete P.limites[u.c]; }
+  if(u.k==="divida") P.dividas=P.dividas.filter(d=>d.id!==u.id);
+  if(u.k!=="tx") salvarPerfil(true);
+  const atual=state.dom.msgs[i]?.acoes?.[k]; if(atual) atual.desfeita=true;
+  salvarChat(); render(); toast("Desfeito");
+}
+
+async function falarComDom(texto){
+  texto=String(texto||"").trim(); const d=state.dom;
+  if(!texto||d.pensando) return;
+  if(!state.sample){ toast("A IA do Dom não está ligada neste app."); return; }
+  d.msgs.push({r:"u",t:texto,em:Date.now()}); d.pensando=true; salvarChat(); render();
+  const conversa=d.msgs.slice(-16).map(m=>`${m.r==="u"?"Pessoa":nomePet()}: ${m.t}${(m.acoes||[]).length?` [ações feitas: ${m.acoes.filter(a=>!a.desfeita).map(a=>a.txt).join("; ")}]`:""}`).join("\n");
+  try{
+    const r=await state.sample.json(`Você é ${nomePet()}, um cachorro marrom de boné vermelho, mascote e consultor financeiro do app MADE. Você conversa com uma pessoa no Brasil que não entende de finanças e quer parar de gastar à toa e juntar dinheiro para comprar um sítio. Fale como um amigo esperto: português do Brasil, frases curtas e simples, carinho e franqueza, sem jargão, sem julgamento e sem tabelas. Use os números reais abaixo e faça contas quando ajudar. É orientação educativa: não indique bancos, corretoras ou produtos de instituições específicas.
+
+Além de conversar, você ANOTA no app o que a pessoa contar na ÚLTIMA mensagem, usando "acoes". Regras:
+- Gasto ou ganho que já aconteceu → "lancamento". Datas como "ontem" ou "sexta" viram datas reais. Sem forma de pagamento, use "Pix".
+- Conta que se repete todo mês (aluguel, internet, luz, academia, assinatura, parcela) → "fixo", com o dia do mês. O app lança sozinho todo mês.
+- "Guardei", "separei", "juntei" dinheiro → "guardar" (meta "reserva" ou o nome da meta, ex.: "sítio").
+- Pedido de limite para uma categoria → "limite". Dívida contada → "divida".
+- Se faltar o valor, PERGUNTE em vez de inventar. Nunca repita ações de mensagens anteriores (elas já foram feitas). Se for só uma pergunta, "acoes" fica vazio.
+- Depois de anotar, confirme em uma frase curta e, quando fizer sentido, dê uma dica concreta com números (ex.: quanto isso pesa no mês ou no sítio).
+
+Hoje é ${ymd(hoje)} (${hoje.toLocaleDateString("pt-BR",{weekday:"long"})}).
+Categorias de saída: ${CATS.saida.map(c=>c[0]+(c[1]==="sup"?" (supérfluo)":"")).join(", ")}. Categorias de entrada: ${CATS.entrada.map(c=>c[0]).join(", ")}.
+
+${contexto()}
+
+Conversa (a última linha é a mensagem nova):
+${conversa}
+
+Responda SOMENTE com JSON:
+{"resposta":"sua resposta para a pessoa","acoes":[
+ {"tipo":"lancamento","tipo_mov":"saida|entrada","valor":0,"desc":"","cat":"","data":"AAAA-MM-DD","pag":"Pix|Débito|Crédito|Dinheiro|Boleto","superfluo":false},
+ {"tipo":"fixo","nome":"","valor":0,"cat":"","dia":5,"pag":"Boleto"},
+ {"tipo":"remover_fixo","nome":""},
+ {"tipo":"guardar","meta":"reserva|sítio|nome da meta","valor":0},
+ {"tipo":"limite","categoria":"","valor":0},
+ {"tipo":"divida","nome":"","saldo":0,"juros":0,"parcela":0}
+]} (use só as ações necessárias; lista vazia se não houver)`,{cache:false});
+    const feitas=[];
+    for(const a of (Array.isArray(r?.acoes)?r.acoes:[]).slice(0,12)){ try{ const x=await aplicarAcao(a); if(x) feitas.push(x); }catch(e){} }
+    const resposta=String(r?.resposta||"").trim()||(feitas.length?"Anotado!":"Não entendi bem. Pode repetir?");
+    d.msgs.push({r:"d",t:resposta,em:Date.now(),acoes:feitas});
+    if(state.perfil.domVoz) falar(resposta);
+  }catch(e){
+    d.msgs.push({r:"d",t:e.code==="invalid_json"?"Me enrolei aqui. Pode repetir?":erroIA(e),em:Date.now()}); semIA(e);
+  }
+  d.pensando=false; salvarChat(); render();
+}
+$("fDom").addEventListener("submit",e=>{ e.preventDefault(); const t=$("domTxt").value; $("domTxt").value=""; falarComDom(t); });
+$("domSugs").querySelectorAll("button").forEach(b=>b.onclick=()=>falarComDom(b.textContent));
+
+/* voz: ouvir (ditado) e falar */
+let ouvindo=null;
+function ditar(input, botao, aoTerminar){
+  if(!Reconhecer){ toast("Este navegador não reconhece voz. Use o Chrome no Android ou o Safari no iPhone."); return; }
+  if(ouvindo){ ouvindo.stop(); return; }
+  const rec=new Reconhecer(); rec.lang="pt-BR"; rec.interimResults=true; rec.continuous=false;
+  const antes=input.value?input.value+" ":""; let final="";
+  rec.onresult=ev=>{ let parcial=""; for(let i=ev.resultIndex;i<ev.results.length;i++){ const t=ev.results[i][0].transcript; if(ev.results[i].isFinal) final+=t; else parcial+=t; } input.value=antes+final+parcial; };
+  rec.onerror=ev=>{ if(ev.error==="not-allowed"||ev.error==="service-not-allowed") toast("Libere o microfone para o site nas configurações do navegador."); else if(ev.error!=="no-speech"&&ev.error!=="aborted") toast("Não consegui ouvir. Tente de novo."); };
+  rec.onend=()=>{ botao.classList.remove("ouvindo"); ouvindo=null; if(final.trim()&&aoTerminar) aoTerminar(); };
+  try{ rec.start(); ouvindo=rec; botao.classList.add("ouvindo"); speechSynthesis?.cancel?.(); }catch(e){ toast("Não deu para ligar o microfone."); }
+}
+$("domMic").onclick=()=>ditar($("domTxt"),$("domMic"),()=>{ const t=$("domTxt").value; $("domTxt").value=""; falarComDom(t); });
+$("qMic").onclick=()=>ditar($("qTexto"),$("qMic"),()=>$("fRapido").requestSubmit());
+function falar(texto){
+  try{
+    if(!window.speechSynthesis) return;
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(String(texto).replace(/[\u{1F300}-\u{1FAFF}]/gu,"")); u.lang="pt-BR"; u.rate=1.04; u.pitch=1.1;
+    const v=speechSynthesis.getVoices().find(x=>/^pt(-|_)BR/i.test(x.lang)); if(v) u.voice=v;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+function renderVoz(){ $("domVoz").setAttribute("aria-pressed",!!state.perfil.domVoz); }
+$("domVoz").onclick=()=>{ state.perfil.domVoz=!state.perfil.domVoz; salvarPerfil(); renderVoz(); toast(state.perfil.domVoz?`O ${nomePet()} vai falar as respostas`:"Respostas só por escrito"); if(state.perfil.domVoz) falar("Oi! Agora eu falo com você."); };
+
+/* relatório por e-mail (Resend, pela função api/email) */
+async function statusEmail(){
+  if(!window.MADE) { state.email={ok:false,para:"",fora:true}; renderEmail(); return; }
+  try{ const s=await (await fetch("api/email")).json(); state.email={ok:!!s.ok,para:s.para||""}; }catch(e){ state.email={ok:false,para:""}; }
+  renderEmail();
+}
+function renderEmail(){
+  const E=state.email, box=$("emailBox"); if(!box) return;
+  box.hidden=!!E.fora;
+  $("emailInfo").innerHTML=E.ok?`Vai para <b>${esc(E.para)}</b>, com o PDF do mês em anexo.${state.perfil.emailUltimo?` Último envio: semana ${esc(state.perfil.emailUltimo.split("-S")[1]||"")}.`:""}`:"O envio por e-mail ainda não está ligado. Falta colocar RESEND_API_KEY e MADE_EMAIL no Vercel.";
+  $("emailAuto").checked=!!state.perfil.emailSemanal; $("emailAuto").disabled=!E.ok; $("btnEmail").disabled=!E.ok;
+}
+function htmlRelatorio(){
+  const {l,T,P:Pw,top}=dadosSemana(), M=totais(doMes(ymd(hoje).slice(0,7))), s=state.perfil.semanal, meta=state.perfil.metas[0];
+  const dif=Pw.sai?Math.round((T.sai/Pw.sai-1)*100):null, img=new URL("mascote-app.png",location.href).href;
+  const linha=(a,b,cor)=>`<tr><td style="padding:8px 0;color:#5F6F68">${a}</td><td style="padding:8px 0;text-align:right;font-weight:700;color:${cor||"#10201B"}">${b}</td></tr>`;
+  const alertas=calcAlertas(doMes(ymd(hoje).slice(0,7)),M).slice(0,3);
+  return `<div style="background:#EEF2EF;padding:24px 12px;font-family:Arial,Helvetica,sans-serif"><div style="max-width:560px;margin:0 auto;background:#fff;border-radius:18px;overflow:hidden">
+<div style="background:#0F2E27;color:#F4F0E6;padding:22px 24px"><table width="100%"><tr><td><div style="font-size:12px;letter-spacing:2px;color:#A9BFB6">MADE · RELATÓRIO DA SEMANA</div><div style="font-size:26px;font-weight:700;margin-top:6px">${esc(s?.r?.titulo||`Semana do ${nomePet()}`)}</div></td><td width="80" align="right"><img src="${img}" width="72" alt="${esc(nomePet())}" style="display:block"></td></tr></table></div>
+<div style="padding:22px 24px;color:#10201B;font-size:15px;line-height:1.5">
+${s?.r?.texto?`<p style="margin:0 0 14px">${esc(s.r.texto)}</p>`:""}
+<table width="100%" style="border-collapse:collapse;font-size:15px">
+${linha("Gastou nos últimos 7 dias",brl(T.sai),"#B0372F")}
+${linha("Supérfluo na semana",brl(T.sup),"#A8690F")}
+${dif==null?"":linha("Comparado à semana anterior",(dif>0?"+":"")+dif+"%",dif>0?"#B0372F":"#1C7A4B")}
+${top?linha("O que mais pesou",`${esc(top[0])} · ${brl0(top[1])}`):""}
+${linha("No mês: entrou",brl(M.ent),"#1C7A4B")}
+${linha("No mês: saiu",brl(M.sai))}
+${linha(M.saldo>=0?"No mês: sobrou":"No mês: faltou",brl(Math.abs(M.saldo)),M.saldo>=0?"#1C7A4B":"#B0372F")}
+${meta?linha(esc(meta.nome),`${brl0(meta.guardado)} de ${brl0(alvoReal(meta))}`,"#A9823F"):""}
+</table>
+${(s?.r?.destaques||[]).length?`<ul style="padding-left:18px;color:#5F6F68">${s.r.destaques.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
+${s?.r?.desafio?`<div style="background:#F3EBDA;border-radius:12px;padding:12px 14px;margin:14px 0"><b>Desafio da semana:</b> ${esc(s.r.desafio)}</div>`:""}
+${alertas.length?`<div style="margin-top:14px">${alertas.map(([n,t,dd])=>`<div style="border-left:4px solid ${n==="alto"?"#B0372F":n==="medio"?"#A8690F":"#1C7A4B"};padding:4px 10px;margin:8px 0"><b>${esc(t)}</b><br><span style="color:#5F6F68;font-size:13px">${esc(dd)}</span></div>`).join("")}</div>`:""}
+<p style="margin:18px 0 0"><a href="${esc(location.href.split("#")[0])}" style="display:inline-block;background:#17694F;color:#fff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:700">Abrir o MADE</a></p>
+<p style="color:#5F6F68;font-size:12px;margin-top:18px">O PDF completo do mês vai em anexo. ${l.length} lançamentos nos últimos 7 dias. Orientação educativa, não é recomendação de investimento.</p>
+</div></div></div>`;
+}
+async function enviarEmail(auto){
+  if(!state.email.ok||!window.MADE) return false;
+  const btn=$("btnEmail"); btn.disabled=true; const txt0=btn.textContent; btn.textContent="Montando e enviando…";
+  let ok=false;
+  try{
+    if(state.sample&&state.perfil.semanal?.chave!==chaveSemana()&&dadosSemana().l.length>=3) await gerarSemana();
+    const mesAntes=state.mes; state.mes=ymd(hoje).slice(0,7);
+    let pdf="";
+    try{ const blob=await montarPdf(); pdf=await new Promise(r=>{ const f=new FileReader(); f.onload=()=>r(String(f.result).split(",")[1]); f.readAsDataURL(blob); }); }catch(e){}
+    state.mes=mesAntes;
+    const c=window.MADE.codigo(true); if(!c) throw new Error("sem código");
+    const resp=await fetch("api/email",{method:"POST",headers:{"content-type":"application/json","x-made-codigo":c},body:JSON.stringify({assunto:`${nomePet()}: seu relatório da semana · MADE`,html:htmlRelatorio(),pdf,arquivo:`MADE-relatorio-${ymd(hoje)}.pdf`})});
+    const corpo=await resp.json().catch(()=>({}));
+    if(resp.status===401){ window.MADE.esquecer(); throw new Error("Código de acesso errado"); }
+    if(!resp.ok) throw new Error(corpo.message||"Falhou");
+    state.perfil.emailUltimo=chaveSemana(); salvarPerfil(true); ok=true;
+    toast(auto?`${nomePet()} mandou o relatório da semana para o seu e-mail`:"Relatório enviado para o seu e-mail");
+  }catch(e){ if(!auto) toast("Não deu para enviar: "+(e.message||"tente de novo")); }
+  btn.disabled=!state.email.ok; btn.textContent=txt0; renderEmail();
+  return ok;
+}
+function talvezEmail(){
+  const P=state.perfil;
+  if(!P.emailSemanal||!state.email.ok||P.emailUltimo===chaveSemana()||!state.tx.length) return;
+  enviarEmail(true);
+}
+$("btnEmail").onclick=()=>enviarEmail(false);
+$("emailAuto").onchange=()=>{ state.perfil.emailSemanal=$("emailAuto").checked; salvarPerfil(true); toast(state.perfil.emailSemanal?"Relatório semanal por e-mail ligado":"Relatório por e-mail desligado"); };
 
 /* plano para cada entrada de dinheiro */
 function planoEntrada(t){
@@ -1406,8 +1671,10 @@ async function iniciar(){
   state.modo="db";
   state.perfilRef=db.doc("data/users/"+uid+"/perfil");
   state.txCol=state.perfilRef.collection("tx");
-  state.perfilRef.onSnapshot(s=>{ if(s.exists) Object.assign(state.perfil,JSON.parse(JSON.stringify(s.data()))); state.carregado.perfil=true; render(); talvezAuto(); talvezSemana(); },()=>{});
-  state.txCol.onSnapshot(s=>{ state.tx=s.docs.map(d=>({...d.data(),id:d.id})); state.carregado.tx=true; render(); talvezAuto(); talvezSemana(); },
+  state.dom.ref=db.doc("data/users/"+uid+"/chat");
+  state.dom.ref.onSnapshot(s=>{ const m=s.exists?s.data().msgs:null; if(!Array.isArray(m)||state.dom.pensando) return; const novo=JSON.stringify(m); if(novo===JSON.stringify(state.dom.msgs)) return; state.dom.msgs=JSON.parse(novo); state.dom.v++; render(); },()=>{});
+  state.perfilRef.onSnapshot(s=>{ if(s.exists) Object.assign(state.perfil,JSON.parse(JSON.stringify(s.data()))); state.carregado.perfil=true; render(); talvezAuto(); talvezSemana(); depoisDeCarregar(); },()=>{});
+  state.txCol.onSnapshot(s=>{ state.tx=s.docs.map(d=>({...d.data(),id:d.id})); state.carregado.tx=true; render(); talvezAuto(); talvezSemana(); depoisDeCarregar(); },
     e=>{ if(e.code==="revoked"||e.code==="not_granted") modoDemo(); else toast("A conexão caiu. Recarregue a página."); });
 }
 saudacao(); fillForm();

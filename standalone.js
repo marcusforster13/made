@@ -7,12 +7,15 @@
   const CHAVE = "made-dados-v1";
   const ler = () => { try { return JSON.parse(localStorage.getItem(CHAVE)) || {}; } catch (e) { return {}; } };
   let store = ler();
+  // cada ouvinte escuta um documento ou uma coleção; só é avisado quando o que ele escuta muda
   const ouvintes = new Set();
-  const avisar = () => ouvintes.forEach((f) => f());
-  function gravar() {
+  const toca = (o, mudou) => !mudou || (o.col ? mudou.startsWith(o.path + "/") && !mudou.slice(o.path.length + 1).includes("/") : o.path === mudou);
+  const avisar = (mudou) => ouvintes.forEach((o) => { if (toca(o, mudou)) o.f(); });
+  const ouvir = (path, col, f) => { const o = { path, col, f }; ouvintes.add(o); setTimeout(f, 0); return () => ouvintes.delete(o); };
+  function gravar(mudou) {
     try { localStorage.setItem(CHAVE, JSON.stringify(store)); }
     catch (e) { throw { code: "quota_exceeded", message: "Sem espaço no aparelho" }; }
-    avisar();
+    avisar(mudou);
   }
   addEventListener("storage", (e) => { if (e.key === CHAVE) { store = ler(); avisar(); } });
   const copia = (d) => JSON.parse(JSON.stringify(d));
@@ -31,13 +34,13 @@
     return {
       id, path,
       get: async () => snap(id, store[path]),
-      set: async (d) => { store[path] = copia(d); gravar(); },
+      set: async (d) => { store[path] = copia(d); gravar(path); },
       update: async (d) => {
         if (!store[path]) throw { code: "invalid_argument", message: "Documento não existe" };
-        store[path] = mescla(store[path], copia(d)); gravar();
+        store[path] = mescla(store[path], copia(d)); gravar(path);
       },
-      delete: async () => { delete store[path]; gravar(); },
-      onSnapshot(next) { const f = () => next(snap(id, store[path])); ouvintes.add(f); setTimeout(f, 0); return () => ouvintes.delete(f); },
+      delete: async () => { delete store[path]; gravar(path); },
+      onSnapshot(next) { return ouvir(path, false, () => next(snap(id, store[path]))); },
       collection: (nome) => colRef(path + "/" + nome),
     };
   }
@@ -49,7 +52,7 @@
       doc: (id) => docRef(path + "/" + (id || novoId())),
       add: async (d) => { const r = docRef(path + "/" + novoId()); await r.set(d); return r; },
       get: async () => consulta(),
-      onSnapshot(next) { const f = () => next(consulta()); ouvintes.add(f); setTimeout(f, 0); return () => ouvintes.delete(f); },
+      onSnapshot(next) { return ouvir(path, true, () => next(consulta())); },
       where: () => ref, orderBy: () => ref, limit: () => ref,
     };
     return ref;
@@ -121,6 +124,9 @@
       return { status: "saved" };
     },
   };
+
+  // usado pelo relatório por e-mail, que fala com a api/email com o mesmo código
+  window.MADE = { codigo, esquecer: () => { try { localStorage.removeItem("made-codigo"); } catch (e) {} } };
 
   window.claude = {
     use: async (nome) => {
