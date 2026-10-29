@@ -126,7 +126,16 @@
   };
 
   // usado pelo relatório por e-mail, que fala com a api/email com o mesmo código
-  window.MADE = { codigo, esquecer: () => { try { localStorage.removeItem("made-codigo"); } catch (e) {} } };
+  window.MADE = {
+    codigo,
+    esquecer: () => { try { localStorage.removeItem("made-codigo"); } catch (e) {} },
+    // cópia de segurança: tudo que o app guardou neste aparelho
+    exportar: () => JSON.stringify(store),
+    importar: (dados) => {
+      if (!dados || typeof dados !== "object" || !Object.keys(dados).some((k) => k.startsWith("data/users/"))) throw new Error("Arquivo não é um backup do MADE");
+      store = dados; gravar();
+    },
+  };
 
   window.claude = {
     use: async (nome) => {

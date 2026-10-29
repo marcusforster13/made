@@ -323,6 +323,11 @@ a.linkbtn::after{content:"↗";color:var(--gold);font-weight:800}
       <button class="ghost" id="verAlertas" hidden></button>
     </section>
 
+    <section class="card" id="cardContas">
+      <div class="between"><h2>Próximas contas</h2><button class="ghost" data-go="dom">Cadastrar ›</button></div>
+      <div id="contasLista" style="display:grid;gap:10px"></div>
+    </section>
+
     <section class="card" id="cardOrc">
       <div class="between"><h2>Orçamento do mês</h2><button class="ghost" data-go="consultor" data-anchor="orc">Ajustar ›</button></div>
       <div class="bars" id="orcMini"></div>
@@ -425,6 +430,17 @@ a.linkbtn::after{content:"↗";color:var(--gold);font-weight:800}
       <span class="tiny muted">O mascote usa o valor de guardar para calcular quanto você pode gastar por dia.</span>
     </section>
 
+    <section class="card" id="cardBackup">
+      <div><span class="advisor-tag">Segurança</span><h2 style="margin-top:6px">Cópia de segurança</h2></div>
+      <p class="small muted" style="margin:0">Seus dados ficam neste celular. A cópia guarda tudo na nuvem, criptografado com o seu código de acesso, para recuperar se trocar de celular ou limpar o navegador.</p>
+      <span class="small" id="bkInfo">Conferindo…</span>
+      <label class="switch" style="background:var(--surface2)"><span>Fazer cópia sozinho<span class="tiny muted" style="display:block;font-weight:500">Quando houver mudanças, no máximo a cada 30 minutos</span></span><input type="checkbox" id="bkAuto"></label>
+      <div class="row2"><button class="primary" id="bkAgora">Fazer cópia agora</button><button id="bkRestaurar">Restaurar da nuvem</button></div>
+      <div class="row2"><button id="bkBaixar">Baixar arquivo</button><label class="btn" for="bkArquivo" style="display:grid;place-items:center;text-align:center">Restaurar de arquivo</label></div>
+      <input type="file" id="bkArquivo" accept=".json,application/json" hidden>
+      <span class="tiny muted">O arquivo baixado não é criptografado: guarde em lugar seguro.</span>
+    </section>
+
     <section class="card">
       <div class="row"><span class="avatar" style="background-image:url(mascote-app.png)"></span><div><span class="advisor-tag">Converse</span><h2 style="margin-top:4px">Fale com o Dom</h2></div></div>
       <p class="small muted" style="margin:0">Pergunte qualquer coisa ou conte seus gastos por voz. Ele anota, cadastra seus gastos fixos e lembra da conversa.</p>
@@ -496,6 +512,7 @@ a.linkbtn::after{content:"↗";color:var(--gold);font-weight:800}
       <button type="button">Gastei 42 no iFood hoje</button>
       <button type="button">Recebi meu salário de 3200</button>
       <button type="button">Guardei 200 pro sítio</button>
+      <button type="button">Quais contas vencem esta semana?</button>
       <button type="button">Como estou este mês?</button>
     </div>
     <details id="fixosBox"><summary><span>Gastos fixos do mês <span class="tiny muted" id="fixosTot"></span></span></summary><div class="inner" id="fixosLista"></div></details>
@@ -743,7 +760,7 @@ function render(){
   $("mesLabel").textContent = nomeMes.slice(0,3)+" "+y;
   const list=doMes(), T=totais(list);
   $("hLabel").textContent = (T.saldo>=0?"Sobrou em ":"Faltou em ")+nomeMes;
-  $("hSaldo").textContent = brl0(T.saldo); $("hEnt").textContent=brl0(T.ent); $("hSai").textContent=brl0(T.sai);
+  $("hSaldo").textContent = brl0(Math.abs(T.saldo)); $("hEnt").textContent=brl0(T.ent); $("hSai").textContent=brl0(T.sai);
   const base=Math.max(T.ent,T.sai)||1;
   $("hStack").innerHTML=[[T.ess,"#7FD1AE"],[T.des,"#D3B176"],[T.sup,"#F0A04B"],[Math.max(T.saldo,0),"rgba(255,255,255,.35)"]].map(([v,c])=>v>0?`<i style="width:${v/base*100}%;background:${c}"></i>`:"").join("");
 
@@ -754,7 +771,7 @@ function render(){
   $("bannerGap").style.height = b.hidden?"0":"14px";
   $("boasVindas").hidden = !(state.modo==="db" && state.carregado.tx && !state.tx.length);
 
-  renderPet(T); renderSemana(); renderAjustes(); renderDom(); renderEmail();
+  renderPet(T); renderContas(); renderSemana(); renderAjustes(); renderDom(); renderEmail(); renderBackup();
   renderAlertas(list,T); renderMiniAnalise(); renderOrcMini(list,T); renderMetaMini(T);
   renderLista(list); renderCats(list);
   renderReserva(T); renderMetas(T);
@@ -772,6 +789,29 @@ function hojeInfo(T){
   const guardar=guardarPlanejado(T), porDia=(T.ent-(T.sai-gHoje)-guardar)/rest;
   return {gHoje,guardar,porDia,resta:porDia-gHoje,rest};
 }
+/* contas a vencer: vêm dos gastos fixos (dia do mês) */
+function proximasContas(janela=15){
+  const h0=new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate()), out=[];
+  for(const f of state.perfil.fixos||[]){
+    for(const k of [0,1]){
+      const fim=new Date(h0.getFullYear(),h0.getMonth()+k+1,0).getDate(), d=new Date(h0.getFullYear(),h0.getMonth()+k,Math.min(f.dia,fim));
+      const faltam=Math.round((d-h0)/864e5);
+      if(faltam>=0){ if(faltam<=janela) out.push({f,data:ymd(d),faltam}); break; }
+    }
+  }
+  return out.sort((a,b)=>a.faltam-b.faltam||b.f.valor-a.f.valor);
+}
+const quando=n=>n===0?"hoje":n===1?"amanhã":`em ${n} dias`;
+function renderContas(){
+  const L=proximasContas(15), box=$("contasLista"), F=state.perfil.fixos||[];
+  $("cardContas").hidden=state.modo==="carregando"||(!F.length&&!state.tx.length);
+  if(!F.length){ box.innerHTML=`<div class="small muted">Conte ao ${esc(nomePet())} suas contas do mês, por exemplo "aluguel 1100 todo dia 5", e eu aviso antes de cada vencimento.</div>`; return; }
+  const sete=L.filter(x=>x.faltam<=7).reduce((s,x)=>s+x.f.valor,0);
+  box.innerHTML=(L.length?L.slice(0,5).map(x=>`<div class="between" style="gap:12px"><span style="min-width:0"><b style="font-weight:600">${esc(x.f.nome)}</b><span class="tiny muted" style="display:block">dia ${x.data.slice(8,10)}/${x.data.slice(5,7)} · ${esc(x.f.cat)}</span></span><span style="text-align:right;white-space:nowrap"><b data-priv>${brl0(x.f.valor)}</b><span class="chip ${x.faltam<=2?"sup":""}" style="display:block;margin-top:2px">${quando(x.faltam)}</span></span></div>`).join("")
+    :`<div class="small muted">Nenhuma conta nos próximos 15 dias.</div>`)
+    +(sete?`<div class="small muted" style="border-top:1px solid var(--line);padding-top:8px">Nos próximos 7 dias: <b style="color:var(--ink)" data-priv>${brl0(sete)}</b></div>`:"");
+}
+
 function renderPet(T){
   $("petNome").textContent=nomePet();
   const atual=state.mes===ymd(hoje).slice(0,7), dica=DICAS[(hoje.getDate()+hoje.getMonth())%DICAS.length];
@@ -785,7 +825,9 @@ function renderPet(T){
     else if(h.resta<0){ preocupado=true; msg=`Hoje já foram ${brl0(h.gHoje)}, acima dos ${brl0(h.porDia)} do dia. Amanhã a gente segura.`; }
     else msg=`<span class="tiny muted" style="display:block">Hoje você ainda pode gastar</span><span class="big2" data-priv>${brl0(h.resta)}</span><span class="small muted" style="display:block">e mesmo assim guardar ${brl0(h.guardar)} este mês.</span>`;
   }
-  $("petMsg").innerHTML=msg+(state.tx.length&&atual?`<span class="tiny muted" style="display:block;margin-top:6px">${esc(dica)}</span>`:"");
+  const urgente=proximasContas(1);
+  const lembrete=urgente.length?`<span class="small" style="display:block;margin-top:8px;color:var(--gold);font-weight:700">⏰ ${urgente.map(x=>`${esc(x.f.nome)} vence ${quando(x.faltam)} (${brl0(x.f.valor)})`).join(" · ")}</span>`:"";
+  $("petMsg").innerHTML=msg+lembrete+(state.tx.length&&atual&&!urgente.length?`<span class="tiny muted" style="display:block;margin-top:6px">${esc(dica)}</span>`:"");
   $("pet").classList.toggle("preocupado",preocupado);
 }
 
@@ -1034,6 +1076,7 @@ function renderMetaMini(T){
 function calcAlertas(list,T){
   const A=[], prev=doMes(mesRel(-1)), saidas=list.filter(t=>t.tipo==="saida"), soma=f=>saidas.filter(f).reduce((s,t)=>s+t.valor,0), P=state.perfil;
   if(!list.length) return [["baixo","Nada anotado neste mês","Toque no botão dourado + para anotar o primeiro gasto."]];
+  if(state.mes===ymd(hoje).slice(0,7)) for(const x of proximasContas(2)) A.push(["alto",`${x.f.nome} vence ${quando(x.faltam)}: ${brl(x.f.valor)}`,x.faltam===0?"Se ainda não pagou, pague hoje para não ter multa e juros.":"Separe o dinheiro antes de gastar com outras coisas."]);
   if(T.saldo<0) A.push(["alto","Saiu mais do que entrou",`Faltaram ${brl(-T.saldo)}. Isso costuma virar cartão rotativo ou cheque especial, os juros mais altos que existem.`]);
   if(state.mes===ymd(hoje).slice(0,7) && T.ent>0){ const dia=hoje.getDate(), dias=new Date(hoje.getFullYear(),hoje.getMonth()+1,0).getDate(), proj=T.sai/dia*dias;
     if(proj>T.ent && T.saldo>=0 && dia<dias-2) A.push(["medio","No ritmo atual, o mês fecha no vermelho",`Gastando assim até o dia ${dias}, as saídas chegam a ${brl0(proj)}. Entrou ${brl0(T.ent)}.`]); }
@@ -1248,6 +1291,7 @@ Dívidas:
 ${dividas||"nenhuma cadastrada"}
 Limites de orçamento: ${lim||"nenhum"}
 Gastos fixos todo mês: ${(P.fixos||[]).map(f=>`${f.nome} ${f.valor} (dia ${f.dia}, ${f.cat})`).join("; ")||"nenhum cadastrado"}
+Próximas contas a vencer: ${proximasContas(10).map(x=>`${x.f.nome} ${x.f.valor} ${quando(x.faltam)} (${x.data})`).join("; ")||"nenhuma nos próximos 10 dias"}
 Meses anteriores:
 ${hist||"sem dados"}
 Lançamentos do mês (data | tipo | valor | categoria | descrição | pagamento | marcado):
@@ -1451,6 +1495,86 @@ function htmlConta(r){
   </div>`;
 }
 
+/* cópia de segurança: criptografa no aparelho (AES-GCM, chave do código de acesso) e guarda pela api/backup */
+const b64=u8=>btoa(String.fromCharCode(...new Uint8Array(u8))), deB64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function chaveDe(codigo,sal){
+  const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(codigo),"PBKDF2",false,["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2",salt:sal,iterations:200000,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+}
+async function cifrar(texto,codigo){
+  const sal=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},await chaveDe(codigo,sal),new TextEncoder().encode(texto));
+  return {dados:b64(ct),iv:b64(iv),sal:b64(sal)};
+}
+async function decifrar(o,codigo){
+  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:deB64(o.iv)},await chaveDe(codigo,deB64(o.sal)),deB64(o.dados));
+  return new TextDecoder().decode(pt);
+}
+const marca=s=>{ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return (h>>>0).toString(36)+":"+s.length; };
+const bkLocal=(k,v)=>{ try{ if(v===undefined) return localStorage.getItem("made-bk-"+k); localStorage.setItem("made-bk-"+k,v); }catch(e){} };
+state.bk={ok:false,ultimo:null,fora:!window.MADE,ocupado:false};
+async function statusBackup(){
+  if(!window.MADE){ renderBackup(); return; }
+  try{ const s=await (await fetch("api/backup")).json(); state.bk.ok=!!s.ok; state.bk.ultimo=s.ultimo||null; }catch(e){ state.bk.ok=false; }
+  renderBackup();
+}
+function renderBackup(){
+  const B=state.bk, card=$("cardBackup"); if(!card) return;
+  card.hidden=!!B.fora;
+  const quandoFoi=B.ultimo?new Date(B.ultimo).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):null;
+  $("bkInfo").innerHTML=B.ok?(quandoFoi?`✓ Última cópia na nuvem: <b>${quandoFoi}</b>`:"Cópia na nuvem ligada. Ainda não há nenhuma cópia."):`<span class="muted">A cópia na nuvem ainda não está ligada (falta ligar o Blob no Vercel). O arquivo já funciona.</span>`;
+  $("bkAuto").checked=state.perfil.backupAuto!==false; $("bkAuto").disabled=!B.ok;
+  $("bkAgora").disabled=!B.ok||B.ocupado; $("bkRestaurar").disabled=!B.ok||B.ocupado;
+}
+async function fazerBackup(auto){
+  if(!state.bk.ok||state.bk.ocupado||!window.MADE) return false;
+  const texto=window.MADE.exportar(), m=marca(texto);
+  if(auto&&m===bkLocal("marca")) return false;
+  const c=window.MADE.codigo(!auto); if(!c) return false;
+  state.bk.ocupado=true; renderBackup();
+  let ok=false;
+  try{
+    const corpo=await cifrar(texto,c); corpo.n=state.tx.length;
+    const r=await fetch("api/backup",{method:"POST",headers:{"content-type":"application/json","x-made-codigo":c},body:JSON.stringify(corpo)});
+    if(r.status===401){ window.MADE.esquecer(); throw new Error("Código de acesso errado"); }
+    if(!r.ok){ const e=await r.json().catch(()=>({})); throw new Error(e.message||"Falhou"); }
+    bkLocal("marca",m); bkLocal("em",String(Date.now())); state.bk.ultimo=new Date().toISOString(); ok=true;
+    if(!auto) toast("Cópia de segurança feita");
+  }catch(e){ if(!auto) toast("Não deu para fazer a cópia: "+(e.message||"tente de novo")); }
+  state.bk.ocupado=false; renderBackup(); return ok;
+}
+function talvezBackup(){
+  if(state.perfil.backupAuto===false||!state.bk.ok||!state.tx.length) return;
+  if(Date.now()-Number(bkLocal("em")||0)<30*60e3) return;
+  fazerBackup(true);
+}
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") talvezBackup(); });
+function restaurar(dados){ window.MADE.importar(dados); toast("Dados restaurados. Recarregando…"); setTimeout(()=>location.reload(),900); }
+$("bkAgora").onclick=()=>fazerBackup(false);
+$("bkAuto").onchange=()=>{ state.perfil.backupAuto=$("bkAuto").checked; salvarPerfil(true); };
+$("bkRestaurar").onclick=async()=>{
+  const b=$("bkRestaurar");
+  if(!b.dataset.armed){ b.dataset.armed="1"; b.textContent="Toque de novo: troca os dados deste celular"; setTimeout(()=>{ delete b.dataset.armed; b.textContent="Restaurar da nuvem"; },5000); return; }
+  delete b.dataset.armed; b.textContent="Restaurando…";
+  try{
+    const c=window.MADE.codigo(true); if(!c) throw new Error("sem código");
+    const r=await fetch("api/backup",{headers:{"x-made-codigo":c}});
+    if(r.status===401){ window.MADE.esquecer(); throw new Error("Código de acesso errado"); }
+    if(r.status===404) throw new Error("Ainda não existe cópia na nuvem");
+    if(!r.ok) throw new Error("Falhou");
+    let texto; try{ texto=await decifrar(await r.json(),c); }catch(e){ throw new Error("A cópia foi feita com outro código de acesso"); }
+    restaurar(JSON.parse(texto));
+  }catch(e){ toast("Não deu para restaurar: "+(e.message||"tente de novo")); b.textContent="Restaurar da nuvem"; }
+};
+$("bkBaixar").onclick=()=>{ if(!window.MADE) return; salvarArquivo(`MADE-backup-${ymd(hoje)}.json`,window.MADE.exportar()); };
+$("bkArquivo").onchange=async()=>{
+  const f=$("bkArquivo").files[0]; $("bkArquivo").value=""; if(!f) return;
+  try{ const dados=JSON.parse(await f.text()); const n=Object.keys(dados).filter(k=>k.includes("/tx/")).length;
+    const ok=window.confirm?confirm(`Restaurar este arquivo com ${n} lançamentos? Os dados atuais deste celular serão trocados.`):true;
+    if(ok) restaurar(dados);
+  }catch(e){ toast("Esse arquivo não é um backup do MADE."); }
+};
+
 /* gastos fixos: lança sozinho no mês, uma vez */
 const lancandoFixo=new Set();
 async function lancarFixos(){
@@ -1467,6 +1591,7 @@ function depoisDeCarregar(){
   if(!state.carregado.tx||!state.carregado.perfil) return;
   if(!state.fixosFeito){ state.fixosFeito=true; lancarFixos(); }
   if(!state.emailFeito){ state.emailFeito=true; statusEmail().then(talvezEmail); }
+  if(!state.bkFeito){ state.bkFeito=true; statusBackup().then(talvezBackup); }
 }
 
 /* ações que o Dom pode fazer no app */
